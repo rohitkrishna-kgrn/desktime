@@ -20,11 +20,6 @@ function isDesktopActive(user) {
  * Receives attendance events from Odoo 18 custom module.
  */
 router.post('/webhook', async (req, res) => {
-  const secret = req.headers['x-odoo-secret'];
-  if (secret !== process.env.ODOO_WEBHOOK_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const { email, timestamp, location, status, odooAttendanceId } = req.body;
   if (!email || !status || !['check_in', 'check_out'].includes(status)) {
     return res.status(400).json({ error: 'Invalid payload' });
@@ -36,7 +31,7 @@ router.post('/webhook', async (req, res) => {
   // Block check-in if desktop client is not actively running
   if (status === 'check_in' && !isDesktopActive(user)) {
     return res.status(403).json({
-      error: 'Desktop client not active — check-in rejected',
+      error: 'Client is not active',
       userId: user._id,
     });
   }
@@ -127,9 +122,9 @@ router.post('/manual', authenticate, async (req, res) => {
 
   const user = req.user;
 
-  if (!isDesktopActive(user)) {
+  if (action === 'check_in' && !isDesktopActive(user)) {
     return res.status(403).json({
-      error: 'Desktop client is not running. Open the DeskTime desktop app first.',
+      error: 'Client is not active',
     });
   }
 
