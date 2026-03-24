@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=https://backend-desktime.averelabs.com/api
+    restart: always
+    ports:
+      - "3000:3000"   # 👈 exposed for nginx
+    networks:
+      - app-network
+
+  backend:
+    build: ./backend
+    container_name: backend
+    restart: always
+    environment:
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/desktime
+      - JWT_SECRET=eljfnw9fh4w798fuwoewew9e8
+      - JWT_EXPIRES_IN=24h
+      - ODOO_URL=https://odoo.dubaiaudit.com/
+      - ODOO_DB=live
+      - ODOO_ADMIN_USER=rohit@kgrnaudit.com
+      - ODOO_ADMIN_PASSWORD=Rona@200901
+      - SCREENSHOT_RETENTION_DAYS=15
+      - ALLOWED_ORIGINS=*
+    depends_on:
+      - mongodb
+    ports:
+      - "5000:5000"   # 👈 exposed for nginx
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017" 
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+volumes:
+  mongo-data:
+
+networks:
+  app-network:

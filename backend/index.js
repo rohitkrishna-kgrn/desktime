@@ -79,7 +79,7 @@ cron.schedule('0 2 * * *', async () => {
 
 // ── MongoDB Connection & Start ────────────────────────────────────────────────
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/desktime')
+  .connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/desktime')
   .then(() => {
     console.log('[DB] Connected to MongoDB');
     resetBucket(); // reset GridFS bucket after connection
