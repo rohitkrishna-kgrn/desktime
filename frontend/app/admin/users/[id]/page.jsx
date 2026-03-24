@@ -171,7 +171,7 @@ export default function UserDetailPage() {
         {/* Stat cards */}
         <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label="Productive" value={summary ? fmtHours(summary.summary.productive) : '—'} color="text-emerald-600" />
-          <StatCard label="Unproductive" value={summary ? fmtHours(summary.summary.unproductive) : '—'} color="text-red-500" />
+          <StatCard label="Unproductive" value={summary ? fmtHours(Math.max(0, summary.summary.total - summary.summary.productive)) : '—'} color="text-red-500" />
           <StatCard label="Total Active" value={summary ? fmtHours(summary.summary.total) : '—'} color="text-blue-600" />
           <StatCard
             label="Efficiency"

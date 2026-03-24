@@ -55,23 +55,43 @@ cron.schedule('*/5 * * * *', async () => {
   );
 });
 
-// Clean up orphaned GridFS files (screenshots past expiry) — run daily at 2am
+// Delete screenshots past their retention deadline — runs daily at 2 am.
+// Deletes GridFS file first, then the metadata document.
+// The Screenshot model uses a plain index on expiresAt (no TTL) so this cron
+// is the sole deletion path — nothing runs behind the scenes unexpectedly.
 cron.schedule('0 2 * * *', async () => {
-  console.log('[Cleanup] Running screenshot cleanup...');
+  console.log('[Cleanup] Starting screenshot retention cleanup…');
   try {
-    const expired = await Screenshot.find({ expiresAt: { $lte: new Date() } });
+    const now = new Date();
+    // Safety guard: never delete anything created in the last 24 hours,
+    // even if expiresAt is somehow wrong.
+    const safetyFloor = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const expired = await Screenshot.find({
+      expiresAt: { $lte: now },
+      createdAt: { $lte: safetyFloor },
+    }).select('_id fileId').lean();
+
+    if (expired.length === 0) {
+      console.log('[Cleanup] No expired screenshots found.');
+      return;
+    }
+
     const bucket = getBucket();
     let deleted = 0;
+    let errors  = 0;
+
     for (const s of expired) {
       try {
         await bucket.delete(s.fileId);
       } catch {
-        // File may already be gone
+        // GridFS file already gone — still remove the metadata row
+        errors++;
       }
       await Screenshot.deleteOne({ _id: s._id });
       deleted++;
     }
-    console.log(`[Cleanup] Deleted ${deleted} expired screenshots`);
+
+    console.log(`[Cleanup] Deleted ${deleted} screenshots (${errors} GridFS misses).`);
   } catch (err) {
     console.error('[Cleanup] Error:', err.message);
   }

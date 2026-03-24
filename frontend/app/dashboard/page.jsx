@@ -244,7 +244,7 @@ export default function DashboardPage() {
           />
           <StatCard
             label="Unproductive"
-            value={summary ? fmtHours(summary.summary.unproductive) : '—'}
+            value={summary ? fmtHours(Math.max(0, summary.summary.total - summary.summary.productive)) : '—'}
             color="text-red-500"
           />
           <StatCard

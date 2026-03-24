@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find '/c/Users/Rohit Krishna/Desktop/desktime' -maxdepth 3 -name docker-compose* -o -name Dockerfile*)"
+    ]
+  }
+}

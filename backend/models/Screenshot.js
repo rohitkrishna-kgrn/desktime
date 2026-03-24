@@ -9,8 +9,9 @@ const screenshotSchema = new mongoose.Schema(
     contentType: { type: String, default: 'image/jpeg' },
     sizeBytes: { type: Number, default: 0 },
     timestamp: { type: Date, required: true, index: true },
-    // TTL: auto-delete after 15 days
-    expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+    // Retention deadline — enforced by the nightly cron, NOT a TTL index.
+    // A TTL index runs every 60 s and can race with the cron, orphaning GridFS files.
+    expiresAt: { type: Date, required: true, index: true },
   },
   { timestamps: true }
 );
