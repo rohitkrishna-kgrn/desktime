@@ -256,8 +256,11 @@ ipcMain.handle('auth:login', async (_e, { email, password }) => {
     startTracking();
     return { success: true, user: data.user };
   } catch (err) {
-    const errorMsg = err.response?.data?.error || err.message;
-    console.error('[IPC] auth:login failed:', errorMsg);
+    const errorMsg = err.response?.data?.error
+      || (err.response ? `Server error ${err.response.status}` : null)
+      || err.message
+      || 'Unknown error';
+    console.error('[IPC] auth:login failed:', errorMsg, '| status:', err.response?.status, '| code:', err.code);
     return { success: false, error: errorMsg };
   }
 });
@@ -271,8 +274,11 @@ ipcMain.handle('auth:register', async (_e, { email, password, name }) => {
     startTracking();
     return { success: true, user: data.user };
   } catch (err) {
-    const errorMsg = err.response?.data?.error || err.message;
-    console.error('[IPC] auth:register failed:', errorMsg);
+    const errorMsg = err.response?.data?.error
+      || (err.response ? `Server error ${err.response.status}` : null)
+      || err.message
+      || 'Unknown error';
+    console.error('[IPC] auth:register failed:', errorMsg, '| status:', err.response?.status, '| code:', err.code);
     return { success: false, error: errorMsg };
   }
 });
