@@ -181,7 +181,18 @@ export default function LoginPage() {
             : <RegisterForm onSuccess={handleSuccess} />}
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        {/* Download for Windows */}
+        <a
+          href="https://github.com/rohitkrishna-kgrn/desktime/raw/main/desktop/app/DeskTime%20Setup%201.0.0.exe"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <svg className="h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.8" />
+          </svg>
+          Download for Windows
+        </a>
+
+        <p className="mt-5 text-center text-xs text-slate-400">
           Developed by KGRN
         </p>
       </div>

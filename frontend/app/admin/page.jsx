@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { isAuthenticated, getStoredUser } from '../../lib/auth';
 import { getUsers } from '../../lib/api';
 import Navbar from '../../components/Navbar';
@@ -53,7 +54,8 @@ export default function AdminPage() {
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
           <h1 className="text-xl font-bold text-slate-900">Employee Overview</h1>
           <div className="mt-1 flex gap-4 text-sm text-slate-500">
             <span>
@@ -66,6 +68,16 @@ export default function AdminPage() {
               <span className="font-semibold text-slate-600">{users.length}</span> total
             </span>
           </div>
+          </div>
+          <Link
+            href="/admin/manage"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            Manage Users
+          </Link>
         </div>
 
         {/* Filters */}

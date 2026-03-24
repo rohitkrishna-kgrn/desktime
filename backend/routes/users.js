@@ -55,6 +55,45 @@ router.get('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
+ * PATCH /api/users/:id — Admin: update user name and/or password
+ */
+router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { name, password } = req.body;
+    const user = await User.findById(req.params.id).select('+password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (name && name.trim()) user.name = name.trim();
+    if (password) {
+      if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      user.password = password; // pre-save hook hashes it
+    }
+    await user.save();
+    return res.json({ success: true, id: user._id, name: user.name });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/users/:id — Admin: soft-delete (deactivate) a user
+ */
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (String(user._id) === String(req.user._id)) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    user.isActive = false;
+    await user.save();
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * PATCH /api/users/:id/role — Admin: change user role
  */
 router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
