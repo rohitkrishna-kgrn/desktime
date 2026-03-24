@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\(''./routes/attendance''\\); console.log\\(''attendance OK''\\)\")",
+      "Bash(node -e \"require\\(''./utils/sync''\\); console.log\\(''sync OK''\\)\")"
+    ]
+  }
+}

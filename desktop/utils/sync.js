@@ -1,0 +1,101 @@
+const api = require('./api');
+const storage = require('./storage');
+
+let online = true;
+
+/**
+ * Upload a screenshot. If offline, skip (screenshots cannot be stored locally due to size).
+ * Returns true on success.
+ */
+async function syncScreenshot(buffer, timestamp) {
+  try {
+    await api.uploadScreenshot(buffer, timestamp);
+    online = true;
+    return true;
+  } catch (err) {
+    online = false;
+    const status = err.response?.status;
+    // 403 = not checked in — don't retry
+    if (status === 403) {
+      console.log('[Sync] Screenshot rejected: user not checked in');
+      return false;
+    }
+    console.warn('[Sync] Screenshot upload failed (offline?):', err.message);
+    return false;
+  }
+}
+
+/**
+ * Flush and sync productivity logs.
+ * Falls back to offline queue on failure.
+ */
+async function syncProductivityLogs(freshLogs) {
+  // Merge with any queued offline logs
+  const queued = storage.flushProductivityQueue();
+  const all = [...queued, ...freshLogs];
+  if (!all.length) return;
+
+  try {
+    // Send in batches of 200
+    for (let i = 0; i < all.length; i += 200) {
+      await api.sendProductivityLogs(all.slice(i, i + 200));
+    }
+    online = true;
+  } catch {
+    online = false;
+    // Re-queue everything
+    for (const log of all) storage.queueProductivityLog(log);
+    console.warn('[Sync] Productivity logs queued for retry');
+  }
+}
+
+/**
+ * Send heartbeat. Silently fails.
+ */
+async function syncHeartbeat() {
+  try {
+    await api.sendHeartbeat();
+    online = true;
+    return true;
+  } catch {
+    online = false;
+    return false;
+  }
+}
+
+/**
+ * Immediately tell the backend this client is no longer active.
+ * Called on logout and app quit. Best-effort — never throws.
+ */
+async function syncDeactivate() {
+  try {
+    await api.deactivateClient();
+    console.log('[Sync] Client deactivated on backend');
+  } catch (err) {
+    console.warn('[Sync] Deactivate failed (may be offline):', err.message);
+  }
+}
+
+/**
+ * Fetch attendance status from backend.
+ */
+async function fetchAttendanceStatus() {
+  try {
+    return await api.getAttendanceStatus();
+  } catch {
+    return null;
+  }
+}
+
+function isOnline() {
+  return online;
+}
+
+module.exports = {
+  syncScreenshot,
+  syncProductivityLogs,
+  syncHeartbeat,
+  syncDeactivate,
+  fetchAttendanceStatus,
+  isOnline,
+};

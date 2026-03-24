@@ -1,0 +1,52 @@
+{
+  "name": "desktime-desktop",
+  "version": "1.0.0",
+  "description": "DeskTime Desktop Client - Employee Monitoring",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "active-win": "^7.5.0",
+    "axios": "^1.7.2",
+    "electron-store": "^8.2.0",
+    "form-data": "^4.0.0",
+    "screenshot-desktop": "^1.12.7",
+    "sharp": "^0.33.4"
+  },
+  "devDependencies": {
+    "electron": "^31.2.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.desktime.desktop",
+    "productName": "DeskTime",
+    "files": [
+      "**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,readme.md}",
+      "assets/**"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/",
+        "to": "assets/"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/logo.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/logo.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

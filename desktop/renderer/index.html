@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'" />
+  <title>DeskTime</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #1a56db;
+      --blue-dark: #1e40af;
+      --green: #10b981;
+      --red: #ef4444;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      -webkit-app-region: no-drag;
+    }
+
+    /* ── Login Screen ─────────────────────────────── */
+    #login-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 20px 28px;
+      overflow-y: auto;
+    }
+
+    .logo-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .logo-img {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      object-fit: contain;
+      background: var(--blue);
+      padding: 8px;
+    }
+
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .card {
+      width: 100%;
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid var(--border);
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      color: var(--text);
+      background: white;
+      margin-bottom: 14px;
+    }
+
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.12);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: white;
+    }
+
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .error-msg {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #b91c1c;
+    }
+
+    /* ── Main Screen ─────────────────────────────── */
+    #main-screen {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      padding: 24px 20px;
+      gap: 18px;
+    }
+
+    /* Top bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-small {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-small .logo-sm {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-small .name {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .btn-sm {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      background: white;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .btn-sm:hover { background: var(--bg); }
+
+    /* Status card */
+    .status-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #dbeafe;
+      color: var(--blue);
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .user-name { font-size: 15px; font-weight: 600; }
+    .user-email { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .divider { height: 1px; background: var(--border); margin: 0 0 14px; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-green { background: #d1fae5; color: #065f46; }
+    .badge-red   { background: #fee2e2; color: #991b1b; }
+    .badge-gray  { background: #f1f5f9; color: #475569; }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .dot-green { background: var(--green); animation: pulse 2s infinite; }
+    .dot-red   { background: var(--red); }
+    .dot-gray  { background: #94a3b8; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Info rows */
+    .info-rows { display: flex; flex-direction: column; gap: 8px; }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .info-row .key { color: var(--muted); }
+    .info-row .val { font-weight: 500; color: var(--text); }
+    .info-row .val.online { color: var(--green); }
+    .info-row .val.offline { color: var(--red); }
+
+    /* Timestamp */
+    .timestamp-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .timestamp-card .ts { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+    /* ── Tab bar ─────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 14px;
+      width: 100%;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 7px 0;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Auth Screen ────────────────────────────────────────── -->
+  <div id="login-screen">
+    <div class="logo-wrap">
+      <div id="logo-container" class="logo-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">DeskTime</div>
+        <div class="brand-sub" id="auth-subtitle">Sign in to your account</div>
+      </div>
+    </div>
+
+    <!-- Tab switcher -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-login">Sign In</button>
+      <button class="tab-btn" id="tab-register">Register</button>
+    </div>
+
+    <div class="card">
+      <!-- ── Login form ── -->
+      <div id="form-login">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" placeholder="you@company.com" required />
+
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+
+        <button type="button" class="btn btn-primary" id="login-btn">Sign In</button>
+      </div>
+
+      <!-- ── Register form ── -->
+      <div id="form-register" class="hidden">
+        <label for="reg-name">Full Name</label>
+        <input id="reg-name" type="text" autocomplete="name" placeholder="Your full name" required />
+
+        <label for="reg-email">Work Email</label>
+        <input id="reg-email" type="email" autocomplete="email" placeholder="you@company.com" required />
+
+        <label for="reg-password">Password</label>
+        <input id="reg-password" type="password" autocomplete="new-password" placeholder="Min. 6 characters" required />
+
+        <label for="reg-confirm">Confirm Password</label>
+        <input id="reg-confirm" type="password" autocomplete="new-password" placeholder="Repeat password" required />
+
+        <button type="button" class="btn btn-primary" id="register-btn">Create Account</button>
+        <p style="margin-top:8px;font-size:11px;color:var(--muted);text-align:center;">
+          Your email must exist in the company Odoo system.
+        </p>
+      </div>
+
+      <div id="login-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- ── Main Screen ────────────────────────────────────────── -->
+  <div id="main-screen">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="brand-small">
+        <div class="logo-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <span class="name">DeskTime</span>
+      </div>
+      <button class="btn-sm" id="logout-btn">Logout</button>
+    </div>
+
+    <!-- Status card -->
+    <div class="status-card">
+      <div class="user-info">
+        <div class="avatar" id="user-avatar">?</div>
+        <div>
+          <div class="user-name" id="user-name">—</div>
+          <div class="user-email" id="user-email">—</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="status-row">
+        <span class="status-label">Attendance Status</span>
+        <span class="badge badge-gray" id="status-badge">
+          <span class="dot dot-gray" id="status-dot"></span>
+          <span id="status-text">Loading…</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Info rows -->
+    <div class="info-rows">
+      <div class="info-row">
+        <span class="key">Desktop Tracking</span>
+        <span class="val" id="tracking-val">Waiting…</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Server Connection</span>
+        <span class="val" id="connection-val">Connecting…</span>
+      </div>
+      <div class="info-row">
+        <span class="key">Screenshot Interval</span>
+        <span class="val">Every 1 minute</span>
+      </div>
+    </div>
+
+    <!-- Timestamp -->
+    <div class="timestamp-card">
+      <div>Last synced</div>
+      <div class="ts" id="last-updated">—</div>
+    </div>
+  </div>
+
+  <script>
+    const loginScreen  = document.getElementById('login-screen');
+    const mainScreen   = document.getElementById('main-screen');
+    const loginBtn     = document.getElementById('login-btn');
+    const registerBtn  = document.getElementById('register-btn');
+    const loginError   = document.getElementById('login-error');
+    const logoutBtn    = document.getElementById('logout-btn');
+    const tabLogin     = document.getElementById('tab-login');
+    const tabRegister  = document.getElementById('tab-register');
+
+    // Wire tab buttons here — inline onclick is blocked by CSP
+    tabLogin.addEventListener('click', () => switchTab('login'));
+    tabRegister.addEventListener('click', () => switchTab('register'));
+
+    // ── Helpers ──────────────────────────────────────────────
+    function showError(msg) {
+      loginError.textContent = msg;
+      loginError.classList.remove('hidden');
+    }
+
+    function hideError() {
+      loginError.classList.add('hidden');
+    }
+
+    function updateStatusBadge(status) {
+      const badge = document.getElementById('status-badge');
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+
+      badge.className = 'badge';
+      dot.className = 'dot';
+
+      if (status === 'checked_in') {
+        badge.classList.add('badge-green');
+        dot.classList.add('dot-green');
+        text.textContent = 'Checked In';
+      } else if (status === 'checked_out') {
+        badge.classList.add('badge-red');
+        dot.classList.add('dot-red');
+        text.textContent = 'Checked Out';
+      } else {
+        badge.classList.add('badge-gray');
+        dot.classList.add('dot-gray');
+        text.textContent = 'Unknown';
+      }
+    }
+
+    function updateConnectionStatus(online) {
+      const el = document.getElementById('connection-val');
+      el.textContent = online ? 'Connected' : 'Offline';
+      el.className = `val ${online ? 'online' : 'offline'}`;
+    }
+
+    function updateTrackingRow(status) {
+      const el = document.getElementById('tracking-val');
+      if (status === 'checked_in') {
+        el.textContent = 'Active';
+        el.className = 'val online';
+      } else {
+        el.textContent = 'Paused (not checked in)';
+        el.className = 'val offline';
+      }
+    }
+
+    function showMainScreen(user) {
+      loginScreen.style.display = 'none';
+      mainScreen.style.display = 'flex';
+
+      document.getElementById('user-name').textContent = user?.name || '—';
+      document.getElementById('user-email').textContent = user?.email || '—';
+
+      const avatar = document.getElementById('user-avatar');
+      if (user?.avatarUrl) {
+        avatar.innerHTML = `<img src="${user.avatarUrl}" alt="${user.name}" />`;
+      } else {
+        avatar.textContent = (user?.name?.[0] || '?').toUpperCase();
+      }
+    }
+
+    function updateLastUpdated() {
+      const now = new Date();
+      document.getElementById('last-updated').textContent =
+        now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ── Init ─────────────────────────────────────────────────
+    async function init() {
+      if (!window.desktime) {
+        showError('Desktop bridge unavailable. Please restart the app.');
+        return;
+      }
+      try {
+        const user = await window.desktime.getUser();
+        if (user && user.name) {
+          showMainScreen(user);
+          try {
+            const status = await window.desktime.getStatus();
+            updateStatusBadge(status?.status || 'unknown');
+            updateConnectionStatus(status?.online || false);
+            updateTrackingRow(status?.status || 'unknown');
+          } catch { /* status non-critical */ }
+          updateLastUpdated();
+        }
+      } catch (err) {
+        console.error('[Init] error:', err);
+      }
+    }
+
+    // ── Tab switching ─────────────────────────────────────────
+    function switchTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('form-login').classList.toggle('hidden', !isLogin);
+      document.getElementById('form-register').classList.toggle('hidden', isLogin);
+      document.getElementById('tab-login').classList.toggle('active', isLogin);
+      document.getElementById('tab-register').classList.toggle('active', !isLogin);
+      document.getElementById('auth-subtitle').textContent =
+        isLogin ? 'Sign in to your account' : 'Create your DeskTime account';
+      hideError();
+    }
+
+    function onAuthSuccess(result) {
+      showMainScreen(result.user);
+      updateStatusBadge('unknown');
+      updateTrackingRow('unknown');
+      // status:update will arrive shortly from main process
+    }
+
+    // ── Login ─────────────────────────────────────────────────
+    async function doLogin() {
+      hideError();
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in…';
+
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const result = await window.desktime.login(email, password);
+        if (result && result.success) {
+          onAuthSuccess(result);
+        } else {
+          showError((result && result.error) || 'Invalid email or password.');
+        }
+      } catch (err) {
+        console.error('[Login] IPC error:', err);
+        showError('Connection error: ' + (err.message || 'Could not reach backend.'));
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+      }
+    }
+
+    // ── Register ──────────────────────────────────────────────
+    async function doRegister() {
+      hideError();
+      const name     = document.getElementById('reg-name').value.trim();
+      const email    = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const confirm  = document.getElementById('reg-confirm').value;
+
+      if (!name || !email || !password) {
+        showError('All fields are required.');
+        return;
+      }
+      if (password.length < 6) {
+        showError('Password must be at least 6 characters.');
+        return;
+      }
+      if (password !== confirm) {
+        showError('Passwords do not match.');
+        return;
+      }
+
+      registerBtn.disabled = true;
+      registerBtn.textContent = 'Creating account…';
+
+      try {
+        const result = await window.desktime.register(email, password, name);
+        if (result && result.success) {
+          onAuthSuccess(result);
+        } else {
+          showError((result && result.error) || 'Registration failed. Try again.');
+        }
+      } catch (err) {
+        console.error('[Register] IPC error:', err);
+        showError('Connection error: ' + (err.message || 'Could not reach backend.'));
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Create Account';
+      }
+    }
+
+    loginBtn.addEventListener('click', doLogin);
+    registerBtn.addEventListener('click', doRegister);
+
+    // ── Logout ────────────────────────────────────────────────
+    logoutBtn.addEventListener('click', async () => {
+      await window.desktime.logout();
+      mainScreen.style.display = 'none';
+      loginScreen.style.display = 'flex';
+      switchTab('login');
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+    });
+
+    // ── Status updates from main process ─────────────────────
+    // Main process sends this every 10 sec (attendance poll) + every heartbeat
+    window.desktime.onStatusUpdate((data) => {
+      updateStatusBadge(data.status);
+      updateConnectionStatus(data.online);
+      updateTrackingRow(data.status);
+      updateLastUpdated();
+    });
+
+    // ── Clock ─────────────────────────────────────────────────
+    setInterval(updateLastUpdated, 1000);
+
+    init();
+  </script>
+</body>
+</html>
