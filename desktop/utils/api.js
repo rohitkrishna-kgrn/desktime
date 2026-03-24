@@ -1,11 +1,12 @@
 const axios = require('axios');
 const storage = require('./storage');
 
+const API_BASE_URL = 'https://backend-desktime.averelabs.com/api';
+
 function getClient() {
-  const baseURL = storage.getApiUrl();
   const token = storage.getToken();
   return axios.create({
-    baseURL,
+    baseURL: API_BASE_URL,
     timeout: 15000,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

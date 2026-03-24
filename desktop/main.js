@@ -17,7 +17,7 @@ const { getLogoPath } = require('./utils/logoPath');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const HEARTBEAT_INTERVAL_MS    = 60 * 1000;      // 1 min
-const SCREENSHOT_INTERVAL_MS   = 1 * 60 * 1000;  // 1 min (testing)
+const SCREENSHOT_INTERVAL_MS   = 10 * 60 * 1000; // 10 min
 const APP_TRACK_SAMPLE_MS      = 5 * 1000;        // 5 sec samples
 const PRODUCTIVITY_FLUSH_MS    = 1 * 60 * 1000;  // flush every 1 min
 const ATTENDANCE_POLL_MS       = 10 * 1000;       // poll attendance every 10 sec (real-time feel)
@@ -304,11 +304,8 @@ ipcMain.handle('status:get', () => {
 
 ipcMain.handle('status:connection', () => isOnline);
 
-ipcMain.handle('settings:getApiUrl', () => storage.getApiUrl());
-ipcMain.handle('settings:setApiUrl', (_e, url) => {
-  storage.setApiUrl(url);
-  return { success: true };
-});
+ipcMain.handle('settings:getApiUrl', () => 'https://backend-desktime.averelabs.com/api');
+ipcMain.handle('settings:setApiUrl', () => ({ success: true })); // no-op — URL is hardcoded
 
 // ── App Lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {

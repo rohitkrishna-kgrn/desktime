@@ -589,11 +589,13 @@
         if (result && result.success) {
           onAuthSuccess(result);
         } else {
-          showError((result && result.error) || 'Invalid email or password.');
+          const msg = (result && result.error && result.error.trim())
+            || 'Login failed — check your email and password.';
+          showError(msg);
         }
       } catch (err) {
         console.error('[Login] IPC error:', err);
-        showError('Connection error: ' + (err.message || 'Could not reach backend.'));
+        showError('Connection error: ' + (err.message || 'Could not reach the server. Check your internet connection.'));
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Sign In';

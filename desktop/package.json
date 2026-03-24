@@ -11,7 +11,6 @@
     "build": "electron-builder"
   },
   "dependencies": {
-    "active-win": "^7.5.0",
     "axios": "^1.7.2",
     "electron-store": "^8.2.0",
     "form-data": "^4.0.0",
@@ -27,8 +26,15 @@
     "productName": "DeskTime",
     "files": [
       "**/*",
-      "!node_modules/*/{CHANGELOG.md,README.md,readme.md}",
+      "!node_modules/*/{CHANGELOG.md,README.md,readme.md,LICENSE}",
       "assets/**"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/screenshot-desktop/**",
+      "node_modules/electron-store/**",
+      "node_modules/conf/**"
     ],
     "extraResources": [
       {
@@ -46,7 +52,8 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
     }
   }
 }

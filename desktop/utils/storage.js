@@ -6,7 +6,6 @@ const store = new Store({
   schema: {
     token: { type: 'string', default: '' },
     user: { type: 'object', default: {} },
-    apiUrl: { type: 'string', default: 'https://backend-desktime.averelabs.com/api' },
     offlineQueue: {
       type: 'object',
       properties: {
@@ -41,15 +40,6 @@ function isAuthenticated() {
   return !!getToken();
 }
 
-// ── API URL ───────────────────────────────────────────────────────────────────
-function getApiUrl() {
-  return store.get('apiUrl', 'https://backend-desktime.averelabs.com/api');
-}
-
-function setApiUrl(url) {
-  store.set('apiUrl', url);
-}
-
 // ── Offline Queue ─────────────────────────────────────────────────────────────
 function queueProductivityLog(log) {
   const current = store.get('offlineQueue.productivityLogs', []);
@@ -74,8 +64,6 @@ module.exports = {
   getToken,
   getUser,
   isAuthenticated,
-  getApiUrl,
-  setApiUrl,
   queueProductivityLog,
   flushProductivityQueue,
   getQueuedProductivityLogs,
