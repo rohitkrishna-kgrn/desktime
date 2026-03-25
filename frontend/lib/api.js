@@ -70,6 +70,8 @@ export const getUser = (id) =>
   api.get(`/users/${id}`).then((r) => r.data);
 export const updateUser = (id, data) =>
   api.patch(`/users/${id}`, data).then((r) => r.data);
+export const updateUserRole = (id, role) =>
+  api.patch(`/users/${id}/role`, { role }).then((r) => r.data);
 export const deleteUser = (id) =>
   api.delete(`/users/${id}`).then((r) => r.data);
 

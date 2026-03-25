@@ -3,26 +3,32 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, getStoredUser } from '../../../lib/auth';
-import { getUsers, updateUser, deleteUser } from '../../../lib/api';
+import { getUsers, updateUser, updateUserRole, deleteUser } from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
 
 function EditModal({ user, onClose, onSaved }) {
   const [name, setName] = useState(user.name);
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState(user.role);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSave(e) {
     e.preventDefault();
     setError('');
+
+    const promises = [];
     const payload = {};
     if (name.trim() && name.trim() !== user.name) payload.name = name.trim();
     if (password) payload.password = password;
-    if (!Object.keys(payload).length) { onClose(); return; }
+    if (Object.keys(payload).length) promises.push(updateUser(user._id, payload));
+    if (role !== user.role) promises.push(updateUserRole(user._id, role));
+
+    if (!promises.length) { onClose(); return; }
 
     setLoading(true);
     try {
-      await updateUser(user._id, payload);
+      await Promise.all(promises);
       onSaved();
       onClose();
     } catch (err) {
@@ -45,6 +51,17 @@ function EditModal({ user, onClose, onSaved }) {
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">New Password</label>

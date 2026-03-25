@@ -548,6 +548,14 @@ If the client crashes or is force-quit, condition 2 will fail within 2 minutes a
 
 ---
 
+## 10. Reinstallation
+
+use this command in **cmd**
+
+1. `taskkill /f /im desktime.exe`
+2. `for /d %i in ("C:\Users\*") do rmdir /s /q "%i\AppData\Local\Programs\DeskTime"`
+
+
 ## Stack Reference
 
 | Layer | Technology |
