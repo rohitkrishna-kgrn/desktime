@@ -3,10 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  PieChart, Pie, Cell, Tooltip as RechartTooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+} from 'recharts';
 import { isAuthenticated, getStoredUser } from '../../lib/auth';
 import { getAdminOverview } from '../../lib/api';
 import Navbar from '../../components/Navbar';
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtHours(seconds) {
   if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
@@ -15,6 +20,7 @@ function fmtHours(seconds) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+// ── Big Four stat card ─────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, color, icon }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -30,6 +36,7 @@ function StatCard({ label, value, sub, color, icon }) {
   );
 }
 
+// ── Status pill ────────────────────────────────────────────────────────────────
 function StatusPill({ user }) {
   if (user.onBreak) {
     return (
@@ -63,6 +70,38 @@ function StatusPill({ user }) {
   );
 }
 
+// ── Pie chart tooltip ──────────────────────────────────────────────────────────
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const { name, value, payload: inner } = payload[0];
+  return (
+    <div className="rounded-xl bg-white px-3 py-2 shadow-lg ring-1 ring-slate-200 text-xs">
+      <p className="font-semibold text-slate-700">{name}</p>
+      <p className="text-slate-500">{inner.isTime ? fmtHours(value) : `${value} break${value !== 1 ? 's' : ''}`}</p>
+    </div>
+  );
+}
+
+// ── Bar chart tooltip ──────────────────────────────────────────────────────────
+function BarTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl bg-white px-3 py-2 shadow-lg ring-1 ring-slate-200 text-xs">
+      <p className="mb-1 font-semibold text-slate-700">{label}</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} style={{ color: p.fill }} className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: p.fill }} />
+          {p.name}: {fmtHours(p.value)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const PROD_COLORS   = { productive: '#10b981', unproductive: '#ef4444', neutral: '#94a3b8', break: '#f59e0b' };
+const BREAK_COLORS  = ['#6366f1', '#f59e0b', '#10b981', '#3b82f6', '#ec4899'];
+
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
   { label: 'Checked In', value: 'checked_in' },
@@ -70,6 +109,7 @@ const STATUS_FILTERS = [
   { label: 'Checked Out', value: 'checked_out' },
 ];
 
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter();
   const [overview, setOverview] = useState(null);
@@ -98,12 +138,44 @@ export default function AdminPage() {
     }
   }
 
-  const users = overview?.users || [];
-  const stats = overview?.stats || { total: 0, checkedIn: 0, onBreak: 0, avgProductivity: 0 };
+  const users          = overview?.users          || [];
+  const stats          = overview?.stats          || { total: 0, checkedIn: 0, onBreak: 0, avgProductivity: 0 };
+  const teamProd       = overview?.teamProductivity || { productive: 0, unproductive: 0, neutral: 0, break: 0 };
+  const breakCategories = overview?.breakCategories || [];
 
+  // Productivity pie data
+  const prodPieData = [
+    { name: 'Productive',   value: teamProd.productive,   color: PROD_COLORS.productive,   isTime: true },
+    { name: 'Unproductive', value: teamProd.unproductive, color: PROD_COLORS.unproductive, isTime: true },
+    { name: 'Neutral',      value: teamProd.neutral,      color: PROD_COLORS.neutral,       isTime: true },
+    { name: 'Break',        value: teamProd.break,        color: PROD_COLORS.break,         isTime: true },
+  ].filter((d) => d.value > 0);
+
+  // Break category pie data
+  const breakPieData = breakCategories.map((b, i) => ({
+    name:  b.label,
+    value: b.count,
+    color: BREAK_COLORS[i % BREAK_COLORS.length],
+    isTime: false,
+  }));
+
+  // Team bar data — top 8 users by activity
+  const topUsers = [...users]
+    .filter((u) => u.todayTotal > 0)
+    .sort((a, b) => b.todayTotal - a.todayTotal)
+    .slice(0, 8)
+    .map((u) => ({
+      name:         u.name.split(' ')[0],
+      productive:   u.todayProductive,
+      unproductive: u.todayUnproductive,
+      neutral:      u.todayNeutral,
+      break:        u.todayBreak,
+    }));
+
+  // Filtered table
   const filtered = users.filter((u) => {
-    if (statusFilter === 'on_break') return u.onBreak;
-    if (statusFilter === 'checked_in') return u.currentStatus === 'checked_in' && !u.onBreak;
+    if (statusFilter === 'on_break')    return u.onBreak;
+    if (statusFilter === 'checked_in')  return u.currentStatus === 'checked_in' && !u.onBreak;
     if (statusFilter === 'checked_out') return u.currentStatus === 'checked_out';
     if (search.trim()) {
       const s = search.toLowerCase();
@@ -115,6 +187,8 @@ export default function AdminPage() {
     const s = search.toLowerCase();
     return u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
   });
+
+  const hasChartData = prodPieData.length > 0 || breakPieData.length > 0 || topUsers.length > 0;
 
   return (
     <div className="flex min-h-full flex-col bg-slate-50">
@@ -139,7 +213,7 @@ export default function AdminPage() {
           </Link>
         </div>
 
-        {/* Big Four Stat Cards */}
+        {/* ── Big Four ─────────────────────────────────────────────────── */}
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard
             label="Total Employees"
@@ -154,7 +228,7 @@ export default function AdminPage() {
           <StatCard
             label="Checked In"
             value={loading ? '—' : stats.checkedIn}
-            sub={loading ? '' : `${stats.total > 0 ? Math.round((stats.checkedIn / stats.total) * 100) : 0}% of team`}
+            sub={!loading && stats.total > 0 ? `${Math.round((stats.checkedIn / stats.total) * 100)}% of team` : ''}
             color="text-emerald-600"
             icon={
               <svg className="h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -165,6 +239,7 @@ export default function AdminPage() {
           <StatCard
             label="On Break"
             value={loading ? '—' : stats.onBreak}
+            sub={!loading ? fmtHours(teamProd.break) + ' total today' : ''}
             color="text-amber-600"
             icon={
               <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -176,13 +251,7 @@ export default function AdminPage() {
             label="Avg Productivity"
             value={loading ? '—' : `${stats.avgProductivity}%`}
             sub="active employees today"
-            color={
-              stats.avgProductivity >= 70
-                ? 'text-emerald-600'
-                : stats.avgProductivity >= 40
-                ? 'text-amber-600'
-                : 'text-red-500'
-            }
+            color={stats.avgProductivity >= 70 ? 'text-emerald-600' : stats.avgProductivity >= 40 ? 'text-amber-600' : 'text-red-500'}
             icon={
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -191,7 +260,107 @@ export default function AdminPage() {
           />
         </div>
 
-        {/* Filters */}
+        {/* ── Charts Row ────────────────────────────────────────────────── */}
+        {!loading && hasChartData && (
+          <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+
+            {/* Team Productivity Pie */}
+            {prodPieData.length > 0 && (
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <h2 className="mb-1 text-sm font-semibold text-slate-700">Team Productivity Today</h2>
+                <p className="mb-3 text-xs text-slate-400">Total active hours split</p>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={prodPieData}
+                        cx="50%" cy="50%"
+                        innerRadius={48} outerRadius={72}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {prodPieData.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <RechartTooltip content={<PieTooltip />} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value, entry) => (
+                          <span style={{ color: '#64748b' }}>
+                            {entry.payload.name} ({fmtHours(entry.payload.value)})
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Break Category Pie */}
+            {breakPieData.length > 0 && (
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <h2 className="mb-1 text-sm font-semibold text-slate-700">Break Reasons Today</h2>
+                <p className="mb-3 text-xs text-slate-400">Count of breaks by category</p>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={breakPieData}
+                        cx="50%" cy="50%"
+                        outerRadius={72}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {breakPieData.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <RechartTooltip content={<PieTooltip />} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value, entry) => (
+                          <span style={{ color: '#64748b' }}>
+                            {entry.payload.name} ({entry.payload.value})
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Top Users Bar Chart */}
+            {topUsers.length > 0 && (
+              <div className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 ${prodPieData.length === 0 || breakPieData.length === 0 ? 'lg:col-span-2' : ''}`}>
+                <h2 className="mb-1 text-sm font-semibold text-slate-700">Top Active Employees</h2>
+                <p className="mb-3 text-xs text-slate-400">Today's hours by type</p>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topUsers} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} />
+                      <YAxis tickFormatter={(v) => fmtHours(v)} tick={{ fontSize: 10, fill: '#64748b' }} />
+                      <RechartTooltip content={<BarTooltip />} />
+                      <Bar dataKey="productive"   name="Productive"   stackId="a" fill="#10b981" radius={[0,0,0,0]} />
+                      <Bar dataKey="unproductive" name="Unproductive" stackId="a" fill="#ef4444" />
+                      <Bar dataKey="neutral"      name="Neutral"      stackId="a" fill="#94a3b8" />
+                      <Bar dataKey="break"        name="Break"        stackId="a" fill="#f59e0b" radius={[3,3,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Filters ───────────────────────────────────────────────────── */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative max-w-xs flex-1">
             <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -223,7 +392,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* User Table */}
+        {/* ── User Table ────────────────────────────────────────────────── */}
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
           {loading ? (
             <div className="space-y-px p-4">
@@ -244,7 +413,8 @@ export default function AdminPage() {
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                  <th className="hidden px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:table-cell">Today Active</th>
+                  <th className="hidden px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:table-cell">Productive</th>
+                  <th className="hidden px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 md:table-cell">Unproductive</th>
                   <th className="hidden px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 md:table-cell">Break</th>
                   <th className="hidden px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 lg:table-cell">Efficiency</th>
                   <th className="hidden px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 xl:table-cell">Desktop</th>
@@ -271,23 +441,30 @@ export default function AdminPage() {
                         <p className="mt-0.5 text-xs text-slate-400">{u.currentBreakReason}</p>
                       )}
                     </td>
-                    <td className="hidden px-5 py-3.5 text-right font-medium text-slate-700 sm:table-cell">
-                      {fmtHours(u.todayTotal)}
+                    <td className="hidden px-5 py-3.5 text-right font-medium text-emerald-600 sm:table-cell">
+                      {fmtHours(u.todayProductive)}
+                    </td>
+                    <td className="hidden px-5 py-3.5 text-right text-red-500 md:table-cell">
+                      {fmtHours(u.todayUnproductive)}
                     </td>
                     <td className="hidden px-5 py-3.5 text-right text-amber-600 md:table-cell">
                       {fmtHours(u.todayBreak)}
                     </td>
                     <td className="hidden px-5 py-3.5 text-right lg:table-cell">
                       {u.todayTotal > 0 ? (
-                        <span className={`font-semibold ${
-                          u.todayEfficiency >= 70
-                            ? 'text-emerald-600'
-                            : u.todayEfficiency >= 40
-                            ? 'text-amber-600'
-                            : 'text-red-500'
-                        }`}>
-                          {u.todayEfficiency}%
-                        </span>
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="h-1.5 w-16 rounded-full bg-slate-100">
+                            <div
+                              className="h-1.5 rounded-full bg-emerald-400"
+                              style={{ width: `${u.todayEfficiency}%` }}
+                            />
+                          </div>
+                          <span className={`w-9 text-xs font-semibold ${
+                            u.todayEfficiency >= 70 ? 'text-emerald-600' : u.todayEfficiency >= 40 ? 'text-amber-600' : 'text-red-500'
+                          }`}>
+                            {u.todayEfficiency}%
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-slate-300">—</span>
                       )}
@@ -319,6 +496,45 @@ export default function AdminPage() {
             </table>
           )}
         </div>
+
+        {/* ── Break Logs Table ──────────────────────────────────────────── */}
+        {!loading && breakCategories.length > 0 && (
+          <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+              <h2 className="text-sm font-semibold text-slate-700">Break Summary — Today</h2>
+              <p className="text-xs text-slate-400">Aggregated by category across all employees</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Category</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Count</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total Time</th>
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Avg Duration</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {breakCategories.sort((a, b) => b.totalSeconds - a.totalSeconds).map((cat, i) => {
+                  const avg = cat.count > 0 ? Math.round(cat.totalSeconds / cat.count) : 0;
+                  const colors = ['bg-indigo-100 text-indigo-700', 'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700', 'bg-blue-100 text-blue-700', 'bg-pink-100 text-pink-700'];
+                  return (
+                    <tr key={cat.category} className="hover:bg-slate-50 transition">
+                      <td className="px-5 py-3.5">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${colors[i % colors.length]}`}>
+                          {cat.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-semibold text-slate-700">{cat.count}</td>
+                      <td className="px-5 py-3.5 text-right text-slate-600">{fmtHours(cat.totalSeconds)}</td>
+                      <td className="px-5 py-3.5 text-right text-slate-400">{fmtHours(avg)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </main>
     </div>
   );

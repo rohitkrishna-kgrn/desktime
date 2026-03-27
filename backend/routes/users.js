@@ -58,7 +58,7 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
   const users = await User.find({ isActive: true }).select('-__v').lean();
   const userIds = users.map((u) => u._id);
 
-  const [prodAgg, breakAgg] = await Promise.all([
+  const [prodAgg, breakAgg, breakCatAgg] = await Promise.all([
     ProductivityLog.aggregate([
       { $match: { userId: { $in: userIds }, date: todayStr } },
       { $group: {
@@ -70,14 +70,20 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
       { $match: { userId: { $in: userIds }, startTime: { $gte: todayStart, $lte: todayEnd } } },
       { $group: { _id: '$userId', totalBreakSeconds: { $sum: '$durationSeconds' } } },
     ]),
+    BreakLog.aggregate([
+      { $match: { startTime: { $gte: todayStart, $lte: todayEnd } } },
+      { $group: { _id: '$category', count: { $sum: 1 }, totalSeconds: { $sum: '$durationSeconds' } } },
+    ]),
   ]);
 
   const prodMap = {};
   for (const item of prodAgg) {
     const uid = String(item._id.userId);
-    if (!prodMap[uid]) prodMap[uid] = { productive: 0, total: 0 };
+    if (!prodMap[uid]) prodMap[uid] = { productive: 0, unproductive: 0, neutral: 0, total: 0 };
     prodMap[uid].total += item.totalSeconds;
-    if (item._id.category === 'productive') prodMap[uid].productive = item.totalSeconds;
+    if (['productive', 'unproductive', 'neutral'].includes(item._id.category)) {
+      prodMap[uid][item._id.category] = item.totalSeconds;
+    }
   }
 
   const breakMap = {};
@@ -88,19 +94,20 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
   const enriched = users.map((u) => {
     const uid = String(u._id);
     const stale = !u.lastDesktopHeartbeat || now - new Date(u.lastDesktopHeartbeat).getTime() > STALE_MS;
-    const prod = prodMap[uid] || { productive: 0, total: 0 };
+    const prod = prodMap[uid] || { productive: 0, unproductive: 0, neutral: 0, total: 0 };
     const breakSecs = breakMap[uid] || 0;
-    // Add live break duration if currently on break
     const liveSecs = u.onBreak && u.currentBreakStart
       ? Math.round((now - new Date(u.currentBreakStart).getTime()) / 1000)
       : 0;
     return {
       ...u,
       desktopClientActive: !stale,
-      todayProductive: prod.productive,
-      todayTotal: prod.total,
-      todayBreak: breakSecs + liveSecs,
-      todayEfficiency: prod.total > 0 ? Math.round((prod.productive / prod.total) * 100) : 0,
+      todayProductive:   prod.productive,
+      todayUnproductive: prod.unproductive,
+      todayNeutral:      prod.neutral,
+      todayTotal:        prod.total,
+      todayBreak:        breakSecs + liveSecs,
+      todayEfficiency:   prod.total > 0 ? Math.round((prod.productive / prod.total) * 100) : 0,
     };
   });
 
@@ -111,8 +118,32 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
     ? Math.round(withData.reduce((s, u) => s + u.todayEfficiency, 0) / withData.length)
     : 0;
 
+  // Team-wide productivity totals
+  const teamProductivity = enriched.reduce(
+    (acc, u) => ({
+      productive:   acc.productive   + u.todayProductive,
+      unproductive: acc.unproductive + u.todayUnproductive,
+      neutral:      acc.neutral      + u.todayNeutral,
+      break:        acc.break        + u.todayBreak,
+    }),
+    { productive: 0, unproductive: 0, neutral: 0, break: 0 }
+  );
+
+  const CATEGORY_LABELS = {
+    lunch: 'Lunch', personal_call: 'Personal Call',
+    physical_meeting: 'Physical Meeting', short_break: 'Short Break', other: 'Other',
+  };
+  const breakCategories = breakCatAgg.map((b) => ({
+    category: b._id,
+    label:    CATEGORY_LABELS[b._id] || b._id,
+    count:    b.count,
+    totalSeconds: b.totalSeconds,
+  }));
+
   return res.json({
     stats: { total: enriched.length, checkedIn, onBreak, avgProductivity },
+    teamProductivity,
+    breakCategories,
     users: enriched,
   });
 });
