@@ -23,6 +23,11 @@ const userSchema = new mongoose.Schema(
     lastCheckOut: { type: Date, default: null },
     lastAttendanceLocation: { type: String, default: '' },
 
+    // Break state
+    onBreak: { type: Boolean, default: false },
+    currentBreakStart: { type: Date, default: null },
+    currentBreakReason: { type: String, default: '' },
+
     // Desktop client state
     desktopClientActive: { type: Boolean, default: false },
     lastDesktopHeartbeat: { type: Date, default: null },

@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('desktime', {
   getStatus: () => ipcRenderer.invoke('status:get'),
   getConnectionStatus: () => ipcRenderer.invoke('status:connection'),
 
+  // Break
+  startBreak: (reason, category) => ipcRenderer.invoke('break:start', { reason, category }),
+  endBreak: () => ipcRenderer.invoke('break:end'),
+
   // Settings
   getApiUrl: () => ipcRenderer.invoke('settings:getApiUrl'),
   setApiUrl: (url) => ipcRenderer.invoke('settings:setApiUrl', url),

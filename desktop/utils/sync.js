@@ -87,6 +87,28 @@ async function fetchAttendanceStatus() {
   }
 }
 
+async function syncBreakStart(reason, category) {
+  try {
+    const result = await api.startBreak(reason, category);
+    online = true;
+    return result;
+  } catch (err) {
+    online = false;
+    throw err;
+  }
+}
+
+async function syncBreakEnd() {
+  try {
+    const result = await api.endBreak();
+    online = true;
+    return result;
+  } catch (err) {
+    online = false;
+    throw err;
+  }
+}
+
 function isOnline() {
   return online;
 }
@@ -97,5 +119,7 @@ module.exports = {
   syncHeartbeat,
   syncDeactivate,
   fetchAttendanceStatus,
+  syncBreakStart,
+  syncBreakEnd,
   isOnline,
 };

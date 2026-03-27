@@ -2,14 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
+import { format, startOfWeek, startOfMonth } from 'date-fns';
 import { isAuthenticated, getStoredUser } from '../../lib/auth';
 import {
   getAttendanceStatus,
   getProductivitySummary,
   getAppBreakdown,
   getScreenshots,
+  getBreaks,
   manualAttendance,
+  startBreak,
+  endBreak,
 } from '../../lib/api';
 import Navbar from '../../components/Navbar';
 import StatusBadge from '../../components/StatusBadge';
@@ -23,7 +26,16 @@ const PERIODS = [
   { label: 'This Month', value: 'monthly' },
 ];
 
+const BREAK_CATEGORIES = [
+  { value: 'lunch',             label: 'Lunch' },
+  { value: 'personal_call',     label: 'Personal Call' },
+  { value: 'physical_meeting',  label: 'Physical Meeting' },
+  { value: 'short_break',       label: 'Short Break' },
+  { value: 'other',             label: 'Other' },
+];
+
 function fmtHours(seconds) {
+  if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   if (h === 0) return `${m}m`;
@@ -39,14 +51,83 @@ function StatCard({ label, value, color }) {
   );
 }
 
+function BreakModal({ onConfirm, onCancel }) {
+  const [category, setCategory] = useState('short_break');
+  const [customReason, setCustomReason] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleConfirm() {
+    setLoading(true);
+    const reason = customReason.trim() || BREAK_CATEGORIES.find((c) => c.value === category)?.label || category;
+    await onConfirm(reason, category);
+    setLoading(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+        <h2 className="mb-1 text-base font-semibold text-slate-900">Take a Break</h2>
+        <p className="mb-4 text-sm text-slate-500">Select a reason — tracking will pause.</p>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          {BREAK_CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setCategory(cat.value)}
+              className={`rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition ${
+                category === cat.value
+                  ? 'border-amber-400 bg-amber-50 text-amber-700'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Custom reason (optional)
+          </label>
+          <input
+            type="text"
+            value={customReason}
+            onChange={(e) => setCustomReason(e.target.value)}
+            placeholder="e.g. Doctor's appointment"
+            className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading}
+            className="flex-1 rounded-lg bg-amber-500 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
+          >
+            {loading ? 'Starting…' : 'Start Break'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [attendance, setAttendance] = useState(null);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
+  const [showBreakModal, setShowBreakModal] = useState(false);
   const [period, setPeriod] = useState('daily');
   const [summary, setSummary] = useState(null);
   const [apps, setApps] = useState([]);
+  const [todayBreakSecs, setTodayBreakSecs] = useState(0);
   const [screenshots, setScreenshots] = useState([]);
   const [ssLoading, setSsLoading] = useState(true);
   const [ssPage, setSsPage] = useState(1);
@@ -59,7 +140,7 @@ export default function DashboardPage() {
     if (user?.role === 'admin') { router.replace('/admin'); return; }
   }, [router]);
 
-  // Attendance polling every 5 s — keeps the check-in button state responsive
+  // Attendance polling every 5 s
   useEffect(() => {
     fetchAttendance();
     const id = setInterval(fetchAttendance, 5_000);
@@ -73,6 +154,15 @@ export default function DashboardPage() {
     } catch {}
   }
 
+  async function fetchTodayBreaks() {
+    try {
+      const date = format(new Date(), 'yyyy-MM-dd');
+      const breaks = await getBreaks({ date });
+      const total = breaks.reduce((s, b) => s + (b.durationSeconds || 0), 0);
+      setTodayBreakSecs(total);
+    } catch {}
+  }
+
   async function handleManualAttendance(action) {
     setAttendanceError('');
     setAttendanceLoading(true);
@@ -80,8 +170,32 @@ export default function DashboardPage() {
       await manualAttendance(action);
       await fetchAttendance();
     } catch (err) {
-      const msg = err?.response?.data?.error || err.message || 'Action failed.';
-      setAttendanceError(msg);
+      setAttendanceError(err?.response?.data?.error || err.message || 'Action failed.');
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }
+
+  async function handleStartBreak(reason, category) {
+    setAttendanceError('');
+    try {
+      await startBreak(reason, category);
+      setShowBreakModal(false);
+      await fetchAttendance();
+    } catch (err) {
+      setAttendanceError(err?.response?.data?.error || 'Failed to start break.');
+    }
+  }
+
+  async function handleEndBreak() {
+    setAttendanceError('');
+    setAttendanceLoading(true);
+    try {
+      await endBreak();
+      await fetchAttendance();
+      await fetchTodayBreaks();
+    } catch (err) {
+      setAttendanceError(err?.response?.data?.error || 'Failed to end break.');
     } finally {
       setAttendanceLoading(false);
     }
@@ -104,6 +218,11 @@ export default function DashboardPage() {
       setApps(appData);
     } catch {}
   }
+
+  // Fetch today's break total when period is daily
+  useEffect(() => {
+    if (period === 'daily') fetchTodayBreaks();
+  }, [period]);
 
   // Screenshots
   const fetchScreenshots = useCallback(async (page = 1) => {
@@ -133,9 +252,33 @@ export default function DashboardPage() {
     ? Math.round((summary.summary.productive / summary.summary.total) * 100)
     : 0;
 
+  // Live break duration (ticks every 30s)
+  const [liveSecs, setLiveSecs] = useState(0);
+  useEffect(() => {
+    if (attendance?.onBreak && attendance?.currentBreakStart) {
+      const tick = () => {
+        setLiveSecs(Math.round((Date.now() - new Date(attendance.currentBreakStart).getTime()) / 1000));
+      };
+      tick();
+      const id = setInterval(tick, 30_000);
+      return () => clearInterval(id);
+    } else {
+      setLiveSecs(0);
+    }
+  }, [attendance?.onBreak, attendance?.currentBreakStart]);
+
+  const displayBreakSecs = attendance?.onBreak ? todayBreakSecs + liveSecs : todayBreakSecs;
+
   return (
     <div className="flex min-h-full flex-col bg-slate-50">
       <Navbar status={attendance?.status} />
+
+      {showBreakModal && (
+        <BreakModal
+          onConfirm={handleStartBreak}
+          onCancel={() => setShowBreakModal(false)}
+        />
+      )}
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
 
@@ -148,19 +291,57 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <StatusBadge status={attendance?.status} />
-            {attendance?.lastCheckIn && (
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={attendance?.onBreak ? 'on_break' : attendance?.status} />
+            {attendance?.onBreak && attendance?.currentBreakReason && (
+              <span className="text-xs text-amber-600 font-medium">
+                {attendance.currentBreakReason}
+              </span>
+            )}
+            {attendance?.lastCheckIn && !attendance?.onBreak && (
               <span className="text-xs text-slate-400">
                 Since {format(new Date(attendance.lastCheckIn), 'HH:mm')}
               </span>
             )}
 
-            {/* ⚠️ Testing buttons — replace with Odoo webhook in production */}
-            {attendance !== null && (
-              attendance?.desktopClientActive ? (
-                // Desktop is active — show action button
-                attendance?.status !== 'checked_in' ? (
+            {attendance !== null && attendance?.desktopClientActive ? (
+              <>
+                {/* On Break → show Resume button */}
+                {attendance?.onBreak ? (
+                  <button
+                    onClick={handleEndBreak}
+                    disabled={attendanceLoading}
+                    className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {attendanceLoading ? 'Wait…' : 'Resume'}
+                  </button>
+                ) : attendance?.status === 'checked_in' ? (
+                  <>
+                    {/* Checked in → show Take Break + Check Out */}
+                    <button
+                      onClick={() => setShowBreakModal(true)}
+                      className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Take Break
+                    </button>
+                    <button
+                      onClick={() => handleManualAttendance('check_out')}
+                      disabled={attendanceLoading}
+                      className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-600 disabled:opacity-50"
+                    >
+                      <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
+                      {attendanceLoading ? 'Wait…' : 'Check Out'}
+                    </button>
+                  </>
+                ) : (
+                  /* Checked out → Check In */
                   <button
                     onClick={() => handleManualAttendance('check_in')}
                     disabled={attendanceLoading}
@@ -169,28 +350,31 @@ export default function DashboardPage() {
                     <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
                     {attendanceLoading ? 'Wait…' : 'Check In'}
                   </button>
-                ) : (
-                  <button
-                    onClick={() => handleManualAttendance('check_out')}
-                    disabled={attendanceLoading}
-                    className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-600 disabled:opacity-50"
-                  >
-                    <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
-                    {attendanceLoading ? 'Wait…' : 'Check Out'}
-                  </button>
-                )
-              ) : (
-                // Desktop is offline — locked state, clearly shown
-                <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed select-none">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Client Offline
-                </div>
-              )
-            )}
+                )}
+              </>
+            ) : attendance !== null ? (
+              <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed select-none">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Client Offline
+              </div>
+            ) : null}
           </div>
         </div>
+
+        {/* On-break banner */}
+        {attendance?.onBreak && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+            <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <span className="font-semibold">You are on a break.</span>{' '}
+              Screenshots and activity tracking are paused. Break duration: <span className="font-semibold">{fmtHours(liveSecs)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Attendance action error */}
         {attendanceError && (
@@ -205,7 +389,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Desktop client offline banner */}
+        {/* Desktop offline banner */}
         {attendance && !attendance.desktopClientActive && (
           <div className="mb-4 flex items-start gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
             <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -253,9 +437,23 @@ export default function DashboardPage() {
             color="text-blue-600"
           />
           <StatCard
-            label="Efficiency"
-            value={summary ? `${productivePercent}%` : '—'}
-            color={productivePercent >= 70 ? 'text-emerald-600' : productivePercent >= 40 ? 'text-amber-600' : 'text-red-500'}
+            label={period === 'daily' ? 'Break Today' : 'Efficiency'}
+            value={
+              period === 'daily'
+                ? fmtHours(displayBreakSecs)
+                : summary
+                ? `${productivePercent}%`
+                : '—'
+            }
+            color={
+              period === 'daily'
+                ? 'text-amber-600'
+                : productivePercent >= 70
+                ? 'text-emerald-600'
+                : productivePercent >= 40
+                ? 'text-amber-600'
+                : 'text-red-500'
+            }
           />
         </div>
 

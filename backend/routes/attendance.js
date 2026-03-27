@@ -1,13 +1,15 @@
 const express = require('express');
 const User = require('../models/User');
 const AttendanceLog = require('../models/AttendanceLog');
+const BreakLog = require('../models/BreakLog');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
+const BREAK_CATEGORIES = ['lunch', 'personal_call', 'physical_meeting', 'short_break', 'other'];
+
 // Desktop client is considered active only if it sent a heartbeat in the last 2 minutes.
-// This avoids stale DB state when the app is closed between cron runs.
-const DESKTOP_STALE_MS = 2 * 60 * 1000; // 2 minutes
+const DESKTOP_STALE_MS = 2 * 60 * 1000;
 
 function isDesktopActive(user) {
   if (!user.desktopClientActive) return false;
@@ -15,9 +17,22 @@ function isDesktopActive(user) {
   return (Date.now() - new Date(user.lastDesktopHeartbeat).getTime()) < DESKTOP_STALE_MS;
 }
 
+async function autoEndBreak(user, ts) {
+  if (!user.onBreak) return;
+  const durationSeconds = Math.round((ts - new Date(user.currentBreakStart)) / 1000);
+  await BreakLog.findOneAndUpdate(
+    { userId: user._id, endTime: null },
+    { endTime: ts, durationSeconds },
+    { sort: { startTime: -1 } }
+  );
+  user.onBreak = false;
+  user.currentBreakStart = null;
+  user.currentBreakReason = '';
+}
+
 /**
  * POST /api/attendance/webhook
- * Receives attendance events from Odoo 18 custom module.
+ * Receives attendance events from Odoo 18 custom module. No auth required.
  */
 router.post('/webhook', async (req, res) => {
   const { email, timestamp, location, status, odooAttendanceId } = req.body;
@@ -37,6 +52,10 @@ router.post('/webhook', async (req, res) => {
   }
 
   const ts = timestamp ? new Date(timestamp) : new Date();
+
+  // Auto-end any active break on check-out
+  if (status === 'check_out') await autoEndBreak(user, ts);
+
   user.currentStatus = status === 'check_in' ? 'checked_in' : 'checked_out';
   if (status === 'check_in') user.lastCheckIn = ts;
   else user.lastCheckOut = ts;
@@ -62,13 +81,15 @@ router.get('/status', authenticate, async (req, res) => {
   const user = req.user;
   const clientActive = isDesktopActive(user);
 
-  // Auto-correct DB if client has gone stale
   if (user.desktopClientActive && !clientActive) {
     await User.findByIdAndUpdate(user._id, { desktopClientActive: false });
   }
 
   return res.json({
     status:              user.currentStatus,
+    onBreak:             user.onBreak,
+    currentBreakStart:   user.currentBreakStart,
+    currentBreakReason:  user.currentBreakReason,
     lastCheckIn:         user.lastCheckIn,
     lastCheckOut:        user.lastCheckOut,
     location:            user.lastAttendanceLocation,
@@ -123,12 +144,13 @@ router.post('/manual', authenticate, async (req, res) => {
   const user = req.user;
 
   if (action === 'check_in' && !isDesktopActive(user)) {
-    return res.status(403).json({
-      error: 'Client is not active',
-    });
+    return res.status(403).json({ error: 'Client is not active' });
   }
 
   const ts = new Date();
+
+  if (action === 'check_out') await autoEndBreak(user, ts);
+
   user.currentStatus = action === 'check_in' ? 'checked_in' : 'checked_out';
   if (action === 'check_in') user.lastCheckIn = ts;
   else user.lastCheckOut = ts;
@@ -159,9 +181,6 @@ router.post('/heartbeat', authenticate, async (req, res) => {
 
 /**
  * POST /api/attendance/deactivate
- * Called by the desktop client on logout or app quit.
- * Immediately marks the client as inactive so the frontend
- * locks the check-in button without waiting for heartbeat expiry.
  */
 router.post('/deactivate', authenticate, async (req, res) => {
   await User.findByIdAndUpdate(req.user._id, {
@@ -170,6 +189,101 @@ router.post('/deactivate', authenticate, async (req, res) => {
   });
   console.log(`[Attendance] Client deactivated for user: ${req.user.email}`);
   return res.json({ ok: true });
+});
+
+/**
+ * POST /api/attendance/break/start
+ */
+router.post('/break/start', authenticate, async (req, res) => {
+  const user = req.user;
+  if (user.currentStatus !== 'checked_in') {
+    return res.status(400).json({ error: 'Must be checked in to take a break' });
+  }
+  if (user.onBreak) {
+    return res.status(400).json({ error: 'Already on break' });
+  }
+
+  const { reason = '', category = 'other' } = req.body;
+  const safeCategory = BREAK_CATEGORIES.includes(category) ? category : 'other';
+  const now = new Date();
+
+  await User.findByIdAndUpdate(user._id, {
+    onBreak: true,
+    currentBreakStart: now,
+    currentBreakReason: reason,
+  });
+
+  await BreakLog.create({
+    userId: user._id,
+    startTime: now,
+    reason,
+    category: safeCategory,
+  });
+
+  return res.json({ success: true, breakStart: now });
+});
+
+/**
+ * POST /api/attendance/break/end
+ */
+router.post('/break/end', authenticate, async (req, res) => {
+  const user = req.user;
+  if (!user.onBreak) {
+    return res.status(400).json({ error: 'Not currently on break' });
+  }
+
+  const now = new Date();
+  const durationSeconds = Math.round((now - new Date(user.currentBreakStart)) / 1000);
+
+  await User.findByIdAndUpdate(user._id, {
+    onBreak: false,
+    currentBreakStart: null,
+    currentBreakReason: '',
+  });
+
+  await BreakLog.findOneAndUpdate(
+    { userId: user._id, endTime: null },
+    { endTime: now, durationSeconds },
+    { sort: { startTime: -1 } }
+  );
+
+  return res.json({ success: true, durationSeconds });
+});
+
+/**
+ * GET /api/attendance/breaks — Today's breaks for the current user
+ */
+router.get('/breaks', authenticate, async (req, res) => {
+  const { date } = req.query;
+  const d = date ? new Date(date) : new Date();
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+
+  const breaks = await BreakLog.find({
+    userId: req.user._id,
+    startTime: { $gte: d, $lte: end },
+  }).sort({ startTime: 1 });
+
+  return res.json(breaks);
+});
+
+/**
+ * GET /api/attendance/breaks/:userId — Admin: user's breaks
+ */
+router.get('/breaks/:userId', authenticate, requireAdmin, async (req, res) => {
+  const { date } = req.query;
+  const d = date ? new Date(date) : new Date();
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+
+  const breaks = await BreakLog.find({
+    userId: req.params.userId,
+    startTime: { $gte: d, $lte: end },
+  }).sort({ startTime: 1 });
+
+  return res.json(breaks);
 });
 
 module.exports = router;

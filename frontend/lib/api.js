@@ -43,6 +43,16 @@ export const getAttendanceLogsForUser = (userId, params) =>
 export const manualAttendance = (action) =>
   api.post('/attendance/manual', { action }).then((r) => r.data);
 
+// Break
+export const startBreak = (reason, category) =>
+  api.post('/attendance/break/start', { reason, category }).then((r) => r.data);
+export const endBreak = () =>
+  api.post('/attendance/break/end').then((r) => r.data);
+export const getBreaks = (params) =>
+  api.get('/attendance/breaks', { params }).then((r) => r.data);
+export const getBreaksForUser = (userId, params) =>
+  api.get(`/attendance/breaks/${userId}`, { params }).then((r) => r.data);
+
 // Screenshots
 export const getScreenshots = (params) =>
   api.get('/screenshots', { params }).then((r) => r.data);
@@ -64,6 +74,8 @@ export const getAppBreakdownForUser = (userId, params) =>
   api.get(`/productivity/apps/${userId}`, { params }).then((r) => r.data);
 
 // Users (admin)
+export const getAdminOverview = () =>
+  api.get('/users/overview').then((r) => r.data);
 export const getUsers = (params) =>
   api.get('/users', { params }).then((r) => r.data);
 export const getUser = (id) =>

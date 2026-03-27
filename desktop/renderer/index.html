@@ -252,9 +252,10 @@
       font-weight: 600;
     }
 
-    .badge-green { background: #d1fae5; color: #065f46; }
-    .badge-red   { background: #fee2e2; color: #991b1b; }
-    .badge-gray  { background: #f1f5f9; color: #475569; }
+    .badge-green  { background: #d1fae5; color: #065f46; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
+    .badge-gray   { background: #f1f5f9; color: #475569; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
 
     .dot {
       width: 8px;
@@ -285,6 +286,110 @@
     .info-row .val { font-weight: 500; color: var(--text); }
     .info-row .val.online { color: var(--green); }
     .info-row .val.offline { color: var(--red); }
+
+    /* Break button area */
+    .break-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-break {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid #fbbf24;
+      background: #fffbeb;
+      color: #92400e;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-break:hover { background: #fef3c7; }
+    .btn-break:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-resume {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      background: #f59e0b;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-resume:hover { background: #d97706; }
+    .btn-resume:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .break-reason-text {
+      font-size: 11px;
+      color: #92400e;
+      text-align: center;
+    }
+
+    /* Break modal overlay */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.visible { display: flex; }
+
+    .modal-card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .modal-sub   { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .cat-btn {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: white;
+      color: var(--muted);
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .cat-btn:hover { background: #fffbeb; }
+    .cat-btn.selected { border-color: #fbbf24; background: #fffbeb; color: #92400e; }
+
+    .modal-input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    .modal-input:focus { border-color: #fbbf24; }
+
+    .modal-actions { display: flex; gap: 8px; }
+    .modal-actions .btn { flex: 1; padding: 8px; font-size: 12px; }
 
     /* Timestamp */
     .timestamp-card {
@@ -425,6 +530,17 @@
       </div>
     </div>
 
+    <!-- Break section (shown when checked_in) -->
+    <div class="break-section" id="break-section" style="display:none">
+      <!-- Take Break button (shown when not on break) -->
+      <button class="btn-break hidden" id="break-btn">☕ Take a Break</button>
+      <!-- On Break: reason + Resume -->
+      <div id="on-break-info" class="hidden">
+        <p class="break-reason-text" id="break-reason-text"></p>
+        <button class="btn-resume" id="resume-btn" style="margin-top:6px">▶ Resume Work</button>
+      </div>
+    </div>
+
     <!-- Info rows -->
     <div class="info-rows">
       <div class="info-row">
@@ -445,6 +561,31 @@
     <div class="timestamp-card">
       <div>Last synced</div>
       <div class="ts" id="last-updated">—</div>
+    </div>
+  </div>
+
+  <!-- Break reason modal -->
+  <div class="modal-overlay" id="break-modal">
+    <div class="modal-card">
+      <div class="modal-title">Take a Break</div>
+      <div class="modal-sub">Select a reason — tracking will pause.</div>
+
+      <div class="category-grid" id="cat-grid">
+        <button class="cat-btn selected" data-val="short_break">Short Break</button>
+        <button class="cat-btn" data-val="lunch">Lunch</button>
+        <button class="cat-btn" data-val="personal_call">Personal Call</button>
+        <button class="cat-btn" data-val="physical_meeting">Physical Meeting</button>
+        <button class="cat-btn" data-val="other" style="grid-column:span 2">Other</button>
+      </div>
+
+      <input class="modal-input" id="modal-custom-reason" type="text" placeholder="Custom reason (optional)" />
+
+      <div id="modal-error" class="error-msg hidden" style="margin-bottom:10px"></div>
+
+      <div class="modal-actions">
+        <button class="btn" id="modal-cancel-btn" style="border:1px solid var(--border);background:white;color:var(--muted)">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm-btn">Start Break</button>
+      </div>
     </div>
   </div>
 
@@ -472,7 +613,9 @@
       loginError.classList.add('hidden');
     }
 
-    function updateStatusBadge(status) {
+    let selectedCategory = 'short_break';
+
+    function updateStatusBadge(status, onBreak) {
       const badge = document.getElementById('status-badge');
       const dot = document.getElementById('status-dot');
       const text = document.getElementById('status-text');
@@ -480,7 +623,11 @@
       badge.className = 'badge';
       dot.className = 'dot';
 
-      if (status === 'checked_in') {
+      if (onBreak) {
+        badge.classList.add('badge-yellow');
+        dot.classList.add('dot-gray');
+        text.textContent = 'On Break';
+      } else if (status === 'checked_in') {
         badge.classList.add('badge-green');
         dot.classList.add('dot-green');
         text.textContent = 'Checked In';
@@ -501,14 +648,37 @@
       el.className = `val ${online ? 'online' : 'offline'}`;
     }
 
-    function updateTrackingRow(status) {
+    function updateTrackingRow(status, onBreak) {
       const el = document.getElementById('tracking-val');
-      if (status === 'checked_in') {
+      if (onBreak) {
+        el.textContent = 'Paused (on break)';
+        el.className = 'val offline';
+      } else if (status === 'checked_in') {
         el.textContent = 'Active';
         el.className = 'val online';
       } else {
         el.textContent = 'Paused (not checked in)';
         el.className = 'val offline';
+      }
+    }
+
+    function updateBreakSection(status, onBreak) {
+      const section   = document.getElementById('break-section');
+      const breakBtn  = document.getElementById('break-btn');
+      const onBreakInfo = document.getElementById('on-break-info');
+
+      if (status === 'checked_in') {
+        section.style.display = 'flex';
+        section.style.flexDirection = 'column';
+        if (onBreak) {
+          breakBtn.classList.add('hidden');
+          onBreakInfo.classList.remove('hidden');
+        } else {
+          breakBtn.classList.remove('hidden');
+          onBreakInfo.classList.add('hidden');
+        }
+      } else {
+        section.style.display = 'none';
       }
     }
 
@@ -545,9 +715,11 @@
           showMainScreen(user);
           try {
             const status = await window.desktime.getStatus();
-            updateStatusBadge(status?.status || 'unknown');
+            const onBreak = status?.onBreak || false;
+            updateStatusBadge(status?.status || 'unknown', onBreak);
             updateConnectionStatus(status?.online || false);
-            updateTrackingRow(status?.status || 'unknown');
+            updateTrackingRow(status?.status || 'unknown', onBreak);
+            updateBreakSection(status?.status || 'unknown', onBreak);
           } catch { /* status non-critical */ }
           updateLastUpdated();
         }
@@ -655,12 +827,72 @@
       document.getElementById('password').value = '';
     });
 
+    // ── Break modal logic ─────────────────────────────────────
+    document.getElementById('break-btn').addEventListener('click', () => {
+      document.getElementById('break-modal').classList.add('visible');
+      document.getElementById('modal-custom-reason').value = '';
+      document.getElementById('modal-error').classList.add('hidden');
+    });
+
+    document.getElementById('modal-cancel-btn').addEventListener('click', () => {
+      document.getElementById('break-modal').classList.remove('visible');
+    });
+
+    // Category selection
+    document.getElementById('cat-grid').addEventListener('click', (e) => {
+      const btn = e.target.closest('.cat-btn');
+      if (!btn) return;
+      document.querySelectorAll('.cat-btn').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedCategory = btn.dataset.val;
+    });
+
+    document.getElementById('modal-confirm-btn').addEventListener('click', async () => {
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      const errEl = document.getElementById('modal-error');
+      const customReason = document.getElementById('modal-custom-reason').value.trim();
+      const catLabels = {
+        short_break: 'Short Break', lunch: 'Lunch',
+        personal_call: 'Personal Call', physical_meeting: 'Physical Meeting', other: 'Other'
+      };
+      const reason = customReason || catLabels[selectedCategory] || selectedCategory;
+
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Starting…';
+      errEl.classList.add('hidden');
+
+      const result = await window.desktime.startBreak(reason, selectedCategory);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Start Break';
+
+      if (result && result.success) {
+        document.getElementById('break-modal').classList.remove('visible');
+        document.getElementById('break-reason-text').textContent = `On break: ${reason}`;
+      } else {
+        errEl.textContent = result?.error || 'Failed to start break.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('resume-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('resume-btn');
+      btn.disabled = true;
+      btn.textContent = 'Resuming…';
+      const result = await window.desktime.endBreak();
+      btn.disabled = false;
+      btn.textContent = '▶ Resume Work';
+      if (!result?.success) {
+        console.warn('[Break] Resume failed:', result?.error);
+      }
+    });
+
     // ── Status updates from main process ─────────────────────
-    // Main process sends this every 10 sec (attendance poll) + every heartbeat
     window.desktime.onStatusUpdate((data) => {
-      updateStatusBadge(data.status);
+      const onBreak = data.onBreak || false;
+      updateStatusBadge(data.status, onBreak);
       updateConnectionStatus(data.online);
-      updateTrackingRow(data.status);
+      updateTrackingRow(data.status, onBreak);
+      updateBreakSection(data.status, onBreak);
       updateLastUpdated();
     });
 

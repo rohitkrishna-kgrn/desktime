@@ -62,6 +62,18 @@ async function getAttendanceStatus() {
   return res.data;
 }
 
+async function startBreak(reason, category) {
+  const client = getClient();
+  const res = await client.post('/attendance/break/start', { reason, category });
+  return res.data;
+}
+
+async function endBreak() {
+  const client = getClient();
+  const res = await client.post('/attendance/break/end');
+  return res.data;
+}
+
 module.exports = {
   login,
   register,
@@ -70,4 +82,6 @@ module.exports = {
   uploadScreenshot,
   sendProductivityLogs,
   getAttendanceStatus,
+  startBreak,
+  endBreak,
 };
