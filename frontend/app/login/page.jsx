@@ -207,13 +207,13 @@ export default function LoginPage() {
 
         {/* Download for Windows */}
         <a
-          href="https://kgrnauditdxb-my.sharepoint.com/:u:/g/personal/servicedesk_kgrnaudit_com/IQDmm5HppaX7SaemQEmmRedNAXMPWZFUHHAecP9GL_uUHZ0?download=1"
+          href="https://github.com/rohitkrishna-kgrn/desktime/raw/main/desktop/app/DeskTime%20Setup%201.0.0.exe"
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
         >
           <svg className="h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
             <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.8" />
           </svg>
-          Download for Windows
+          Download for Windows Client
         </a>
 
         <p className="mt-5 text-center text-xs text-slate-400">
