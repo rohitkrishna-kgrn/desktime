@@ -28,8 +28,8 @@ api.interceptors.response.use(
 // Auth
 export const login = (email, password) =>
   api.post('/auth/login', { email, password }).then((r) => r.data);
-export const register = (email, password, name) =>
-  api.post('/auth/register', { email, password, name }).then((r) => r.data);
+export const register = (email, password, name, departmentId) =>
+  api.post('/auth/register', { email, password, name, departmentId }).then((r) => r.data);
 export const getMe = () => api.get('/auth/me').then((r) => r.data);
 
 // Attendance
@@ -94,5 +94,19 @@ export const createRule = (data) =>
   api.post('/users/rules', data).then((r) => r.data);
 export const deleteRule = (id) =>
   api.delete(`/users/rules/${id}`).then((r) => r.data);
+
+// Departments
+export const getDepartments = () =>
+  api.get('/departments').then((r) => r.data);
+export const createDepartment = (data) =>
+  api.post('/departments', data).then((r) => r.data);
+export const updateDepartment = (id, data) =>
+  api.patch(`/departments/${id}`, data).then((r) => r.data);
+export const deleteDepartment = (id) =>
+  api.delete(`/departments/${id}`).then((r) => r.data);
+
+// Manager
+export const getManagerOverview = () =>
+  api.get('/users/manager-overview').then((r) => r.data);
 
 export default api;

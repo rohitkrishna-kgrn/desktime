@@ -2,7 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const AttendanceLog = require('../models/AttendanceLog');
 const BreakLog = require('../models/BreakLog');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -118,7 +118,7 @@ router.get('/logs', authenticate, async (req, res) => {
 /**
  * GET /api/attendance/logs/:userId — Admin only
  */
-router.get('/logs/:userId', authenticate, requireAdmin, async (req, res) => {
+router.get('/logs/:userId', authenticate, requireAdminOrManager, async (req, res) => {
   const { from, to, limit = 50 } = req.query;
   const filter = { userId: req.params.userId };
   if (from || to) {
@@ -271,7 +271,7 @@ router.get('/breaks', authenticate, async (req, res) => {
 /**
  * GET /api/attendance/breaks/:userId — Admin: user's breaks
  */
-router.get('/breaks/:userId', authenticate, requireAdmin, async (req, res) => {
+router.get('/breaks/:userId', authenticate, requireAdminOrManager, async (req, res) => {
   const { date } = req.query;
   const d = date ? new Date(date) : new Date();
   d.setHours(0, 0, 0, 0);

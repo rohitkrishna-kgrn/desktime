@@ -8,8 +8,9 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false }, // hashed, never returned by default
     name: { type: String, required: true },
-    role: { type: String, enum: ['employee', 'admin'], default: 'employee' },
+    role: { type: String, enum: ['employee', 'admin', 'manager'], default: 'employee' },
     department: { type: String, default: '' },
+    departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
     jobTitle: { type: String, default: '' },
     avatarUrl: { type: String, default: '' },
 

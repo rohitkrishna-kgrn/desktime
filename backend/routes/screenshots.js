@@ -4,7 +4,7 @@ const sharp = require('sharp');
 const mongoose = require('mongoose');
 const { getBucket } = require('../utils/gridfs');
 const Screenshot = require('../models/Screenshot');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -112,7 +112,7 @@ router.get('/', authenticate, async (req, res) => {
 /**
  * GET /api/screenshots/:userId — Admin only
  */
-router.get('/:userId', authenticate, requireAdmin, async (req, res) => {
+router.get('/:userId', authenticate, requireAdminOrManager, async (req, res) => {
   const { from, to, limit = 50, page = 1 } = req.query;
   const filter = { userId: req.params.userId };
   if (from || to) {

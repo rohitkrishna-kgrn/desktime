@@ -3,15 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, getStoredUser } from '../../../lib/auth';
-import { getUsers, updateUser, updateUserRole, deleteUser } from '../../../lib/api';
+import { getUsers, updateUser, updateUserRole, deleteUser, getDepartments } from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
 
-function EditModal({ user, onClose, onSaved }) {
-  const [name, setName] = useState(user.name);
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState(user.role);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+function EditModal({ user, departments, onClose, onSaved }) {
+  const [name, setName]           = useState(user.name);
+  const [password, setPassword]   = useState('');
+  const [role, setRole]           = useState(user.role);
+  const [departmentId, setDeptId] = useState(user.departmentId?._id || user.departmentId || '');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   async function handleSave(e) {
     e.preventDefault();
@@ -21,6 +22,8 @@ function EditModal({ user, onClose, onSaved }) {
     const payload = {};
     if (name.trim() && name.trim() !== user.name) payload.name = name.trim();
     if (password) payload.password = password;
+    const prevDeptId = user.departmentId?._id || user.departmentId || '';
+    if (departmentId !== prevDeptId) payload.departmentId = departmentId || null;
     if (Object.keys(payload).length) promises.push(updateUser(user._id, payload));
     if (role !== user.role) promises.push(updateUserRole(user._id, role));
 
@@ -60,7 +63,21 @@ function EditModal({ user, onClose, onSaved }) {
               className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
               <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Department</label>
+            <select
+              value={departmentId}
+              onChange={(e) => setDeptId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="">No department</option>
+              {departments.map((d) => (
+                <option key={d._id} value={d._id}>{d.name}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -146,10 +163,11 @@ function DeleteConfirm({ user, onClose, onDeleted }) {
 
 export default function ManageUsersPage() {
   const router = useRouter();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [editUser, setEditUser] = useState(null);
+  const [users, setUsers]           = useState([]);
+  const [departments, setDepts]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState('');
+  const [editUser, setEditUser]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
@@ -157,6 +175,7 @@ export default function ManageUsersPage() {
     const me = getStoredUser();
     if (me?.role !== 'admin') { router.replace('/dashboard'); return; }
     fetchUsers();
+    getDepartments().then(setDepts).catch(() => {});
   }, []);
 
   async function fetchUsers() {
@@ -183,6 +202,7 @@ export default function ManageUsersPage() {
       {editUser && (
         <EditModal
           user={editUser}
+          departments={departments}
           onClose={() => setEditUser(null)}
           onSaved={fetchUsers}
         />
@@ -248,6 +268,7 @@ export default function ManageUsersPage() {
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Email</th>
+                  <th className="hidden px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:table-cell">Department</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Role</th>
                   <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
                 </tr>
@@ -257,10 +278,15 @@ export default function ManageUsersPage() {
                   <tr key={u._id} className="transition hover:bg-slate-50">
                     <td className="px-5 py-3.5 font-medium text-slate-800">{u.name}</td>
                     <td className="px-5 py-3.5 text-slate-500">{u.email}</td>
+                    <td className="hidden px-5 py-3.5 text-slate-500 sm:table-cell">
+                      {u.departmentName || <span className="text-slate-300">—</span>}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                         u.role === 'admin'
                           ? 'bg-purple-100 text-purple-700'
+                          : u.role === 'manager'
+                          ? 'bg-blue-100 text-blue-700'
                           : 'bg-slate-100 text-slate-600'
                       }`}>
                         {u.role}

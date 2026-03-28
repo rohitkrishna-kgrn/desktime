@@ -36,4 +36,11 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, requireAdmin };
+const requireAdminOrManager = (req, res, next) => {
+  if (!['admin', 'manager'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Admin or Manager access required' });
+  }
+  next();
+};
+
+module.exports = { authenticate, requireAdmin, requireAdminOrManager };

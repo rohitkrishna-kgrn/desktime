@@ -1,6 +1,6 @@
 const express = require('express');
 const ProductivityLog = require('../models/ProductivityLog');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 const { categorizeApp } = require('../utils/categorize');
 
 const router = express.Router();
@@ -58,7 +58,7 @@ router.get('/summary', authenticate, async (req, res) => {
 /**
  * GET /api/productivity/summary/:userId — Admin only
  */
-router.get('/summary/:userId', authenticate, requireAdmin, async (req, res) => {
+router.get('/summary/:userId', authenticate, requireAdminOrManager, async (req, res) => {
   const { period = 'daily', date } = req.query;
   const result = await getSummary(req.params.userId, period, date);
   return res.json(result);
@@ -73,7 +73,7 @@ router.get('/apps', authenticate, async (req, res) => {
   return res.json(result);
 });
 
-router.get('/apps/:userId', authenticate, requireAdmin, async (req, res) => {
+router.get('/apps/:userId', authenticate, requireAdminOrManager, async (req, res) => {
   const result = await getAppBreakdown(req.params.userId, req.query);
   return res.json(result);
 });

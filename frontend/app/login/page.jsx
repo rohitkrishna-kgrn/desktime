@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, register } from '../../lib/api';
+import { login, register, getDepartments } from '../../lib/api';
 import { saveSession } from '../../lib/auth';
 
 // ── Shared brand header ───────────────────────────────────────────────────────
@@ -87,9 +87,14 @@ function LoginForm({ onSuccess }) {
 
 // ── Register form ─────────────────────────────────────────────────────────────
 function RegisterForm({ onSuccess }) {
-  const [form, setForm]       = useState({ email: '', name: '', password: '', confirm: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [form, setForm]         = useState({ email: '', name: '', password: '', confirm: '', departmentId: '' });
+  const [departments, setDepts] = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+
+  useEffect(() => {
+    getDepartments().then(setDepts).catch(() => {});
+  }, []);
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
@@ -108,7 +113,7 @@ function RegisterForm({ onSuccess }) {
 
     setLoading(true);
     try {
-      const data = await register(form.email.trim(), form.password, form.name.trim());
+      const data = await register(form.email.trim(), form.password, form.name.trim(), form.departmentId || undefined);
       onSuccess(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
@@ -123,6 +128,24 @@ function RegisterForm({ onSuccess }) {
         value={form.name} onChange={set('name')} placeholder="Your full name" />
       <Field label="Work Email" id="reg-email" type="email" autoComplete="email"
         value={form.email} onChange={set('email')} placeholder="you@company.com" />
+      {departments.length > 0 && (
+        <div>
+          <label htmlFor="reg-dept" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Department
+          </label>
+          <select
+            id="reg-dept"
+            value={form.departmentId}
+            onChange={set('departmentId')}
+            className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="">Select department…</option>
+            {departments.map((d) => (
+              <option key={d._id} value={d._id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <Field label="Password" id="reg-password" type="password" autoComplete="new-password"
         value={form.password} onChange={set('password')} placeholder="Min. 6 characters" />
       <Field label="Confirm Password" id="reg-confirm" type="password" autoComplete="new-password"
@@ -154,6 +177,7 @@ export default function LoginPage() {
   function handleSuccess(data) {
     saveSession(data.token, data.user);
     if (data.user.role === 'admin') router.replace('/admin');
+    else if (data.user.role === 'manager') router.replace('/manager');
     else router.replace('/dashboard');
   }
 

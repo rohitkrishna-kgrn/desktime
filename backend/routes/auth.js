@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt     = require('jsonwebtoken');
 const User    = require('../models/User');
+const Department = require('../models/Department');
 const { checkEmailInOdoo } = require('../utils/odoo');
 const { authenticate }     = require('../middleware/auth');
 
@@ -15,16 +16,20 @@ function signToken(user) {
 }
 
 function publicUser(u) {
+  // u.departmentId may be a populated object or plain ObjectId
+  const deptName = u.departmentId?.name || u.department || '';
   return {
-    id:          u._id,
-    odooId:      u.odooId,
-    email:       u.email,
-    name:        u.name,
-    role:        u.role,
-    department:  u.department,
-    jobTitle:    u.jobTitle,
-    avatarUrl:   u.avatarUrl,
-    currentStatus: u.currentStatus,
+    id:             u._id,
+    odooId:         u.odooId,
+    email:          u.email,
+    name:           u.name,
+    role:           u.role,
+    department:     u.department,
+    departmentId:   u.departmentId?._id || u.departmentId || null,
+    departmentName: deptName,
+    jobTitle:       u.jobTitle,
+    avatarUrl:      u.avatarUrl,
+    currentStatus:  u.currentStatus,
   };
 }
 
@@ -65,16 +70,20 @@ router.post('/register', async (req, res) => {
     }
 
     // 3. Create user — name comes from Odoo if not provided
+    const { departmentId } = req.body;
     const user = await User.create({
-      odooId:     odooInfo.odooId,
-      email:      normalised,
+      odooId:       odooInfo.odooId,
+      email:        normalised,
       password,
-      name:       (name || '').trim() || odooInfo.name,
-      role:       'employee',
-      department: odooInfo.department,
-      jobTitle:   odooInfo.jobTitle,
+      name:         (name || '').trim() || odooInfo.name,
+      role:         'employee',
+      department:   odooInfo.department,
+      departmentId: departmentId || null,
+      jobTitle:     odooInfo.jobTitle,
     });
 
+    // Populate department for the response
+    await user.populate('departmentId', 'name');
     const token = signToken(user);
     return res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {
@@ -111,8 +120,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Populate department for the response
+    const fullUser = await User.findById(user._id).populate('departmentId', 'name');
     const token = signToken(user);
-    return res.json({ token, user: publicUser(user) });
+    return res.json({ token, user: publicUser(fullUser) });
   } catch (err) {
     console.error('[Auth] Login error:', err.message);
     return res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -120,20 +131,22 @@ router.post('/login', async (req, res) => {
 });
 
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
-router.get('/me', authenticate, (req, res) => {
-  const u = req.user;
+router.get('/me', authenticate, async (req, res) => {
+  const u = await User.findById(req.user._id).populate('departmentId', 'name');
   res.json({
-    id:            u._id,
-    odooId:        u.odooId,
-    email:         u.email,
-    name:          u.name,
-    role:          u.role,
-    department:    u.department,
-    jobTitle:      u.jobTitle,
-    avatarUrl:     u.avatarUrl,
-    currentStatus: u.currentStatus,
-    lastCheckIn:   u.lastCheckIn,
-    lastCheckOut:  u.lastCheckOut,
+    id:             u._id,
+    odooId:         u.odooId,
+    email:          u.email,
+    name:           u.name,
+    role:           u.role,
+    department:     u.department,
+    departmentId:   u.departmentId?._id || null,
+    departmentName: u.departmentId?.name || u.department || '',
+    jobTitle:       u.jobTitle,
+    avatarUrl:      u.avatarUrl,
+    currentStatus:  u.currentStatus,
+    lastCheckIn:    u.lastCheckIn,
+    lastCheckOut:   u.lastCheckOut,
     desktopClientActive: u.desktopClientActive,
   });
 });

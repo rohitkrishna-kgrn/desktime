@@ -4,59 +4,22 @@ const User = require('../models/User');
 const AppRule = require('../models/AppRule');
 const ProductivityLog = require('../models/ProductivityLog');
 const BreakLog = require('../models/BreakLog');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const Department = require('../models/Department');
+const { authenticate, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 const { invalidateCache } = require('../utils/categorize');
 
 const router = express.Router();
 
-/**
- * GET /api/users — Admin: list all users with their current status
- */
-router.get('/', authenticate, requireAdmin, async (req, res) => {
-  const { status, search } = req.query;
-  const filter = { isActive: true };
-
-  if (status && ['checked_in', 'checked_out', 'unknown'].includes(status)) {
-    filter.currentStatus = status;
-  }
-  if (search) {
-    filter.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
-    ];
-  }
-
-  const users = await User.find(filter)
-    .select('-__v')
-    .sort({ currentStatus: 1, name: 1 });
-
-  // Mark users whose desktop client heartbeat is stale (> 5 minutes)
+// ── Shared aggregation helper ─────────────────────────────────────────────────
+async function buildOverview(userIds, allUsers) {
   const now = Date.now();
-  const enriched = users.map((u) => {
-    const obj = u.toObject();
-    const stale = !u.lastDesktopHeartbeat || now - u.lastDesktopHeartbeat.getTime() > 5 * 60 * 1000;
-    obj.desktopClientActive = !stale;
-    return obj;
-  });
-
-  return res.json(enriched);
-});
-
-/**
- * GET /api/users/overview — Admin: all users with today's productivity + break stats
- */
-router.get('/overview', authenticate, requireAdmin, async (req, res) => {
   const STALE_MS = 2 * 60 * 1000;
-  const now = Date.now();
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(todayStart);
   todayEnd.setHours(23, 59, 59, 999);
   const todayStr = todayStart.toISOString().slice(0, 10);
-
-  const users = await User.find({ isActive: true }).select('-__v').lean();
-  const userIds = users.map((u) => u._id);
 
   const [prodAgg, breakAgg, breakCatAgg] = await Promise.all([
     ProductivityLog.aggregate([
@@ -71,7 +34,7 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
       { $group: { _id: '$userId', totalBreakSeconds: { $sum: '$durationSeconds' } } },
     ]),
     BreakLog.aggregate([
-      { $match: { startTime: { $gte: todayStart, $lte: todayEnd } } },
+      { $match: { userId: { $in: userIds }, startTime: { $gte: todayStart, $lte: todayEnd } } },
       { $group: { _id: '$category', count: { $sum: 1 }, totalSeconds: { $sum: '$durationSeconds' } } },
     ]),
   ]);
@@ -91,7 +54,7 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
     breakMap[String(item._id)] = item.totalBreakSeconds;
   }
 
-  const enriched = users.map((u) => {
+  const enriched = allUsers.map((u) => {
     const uid = String(u._id);
     const stale = !u.lastDesktopHeartbeat || now - new Date(u.lastDesktopHeartbeat).getTime() > STALE_MS;
     const prod = prodMap[uid] || { productive: 0, unproductive: 0, neutral: 0, total: 0 };
@@ -118,7 +81,6 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
     ? Math.round(withData.reduce((s, u) => s + u.todayEfficiency, 0) / withData.length)
     : 0;
 
-  // Team-wide productivity totals
   const teamProductivity = enriched.reduce(
     (acc, u) => ({
       productive:   acc.productive   + u.todayProductive,
@@ -140,42 +102,131 @@ router.get('/overview', authenticate, requireAdmin, async (req, res) => {
     totalSeconds: b.totalSeconds,
   }));
 
-  return res.json({
+  return {
     stats: { total: enriched.length, checkedIn, onBreak, avgProductivity },
     teamProductivity,
     breakCategories,
     users: enriched,
+  };
+}
+
+/**
+ * GET /api/users — Admin: list all users with their current status
+ */
+router.get('/', authenticate, requireAdmin, async (req, res) => {
+  const { status, search } = req.query;
+  const filter = { isActive: true };
+
+  if (status && ['checked_in', 'checked_out', 'unknown'].includes(status)) {
+    filter.currentStatus = status;
+  }
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  const users = await User.find(filter)
+    .select('-__v')
+    .populate('departmentId', 'name')
+    .sort({ currentStatus: 1, name: 1 });
+
+  const now = Date.now();
+  const enriched = users.map((u) => {
+    const obj = u.toObject();
+    const stale = !u.lastDesktopHeartbeat || now - u.lastDesktopHeartbeat.getTime() > 5 * 60 * 1000;
+    obj.desktopClientActive = !stale;
+    obj.departmentName = u.departmentId?.name || u.department || '';
+    return obj;
   });
+
+  return res.json(enriched);
 });
 
 /**
- * GET /api/users/:id — Admin: get single user detail
+ * GET /api/users/overview — Admin: all users with today's productivity + break stats
  */
-router.get('/:id', authenticate, requireAdmin, async (req, res) => {
-  const user = await User.findById(req.params.id).select('-__v');
+router.get('/overview', authenticate, requireAdmin, async (req, res) => {
+  const users = await User.find({ isActive: true })
+    .select('-__v')
+    .populate('departmentId', 'name')
+    .lean();
+  const enrichedUsers = users.map((u) => ({
+    ...u,
+    departmentName: u.departmentId?.name || u.department || '',
+  }));
+  const userIds = users.map((u) => u._id);
+  const result = await buildOverview(userIds, enrichedUsers);
+  return res.json(result);
+});
+
+/**
+ * GET /api/users/manager-overview — Manager: department users only
+ */
+router.get('/manager-overview', authenticate, async (req, res) => {
+  if (!['admin', 'manager'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  // Find the department managed by this user
+  const dept = await Department.findOne({ managerId: req.user._id, isActive: true });
+  if (!dept) {
+    return res.json({
+      stats: { total: 0, checkedIn: 0, onBreak: 0, avgProductivity: 0 },
+      teamProductivity: { productive: 0, unproductive: 0, neutral: 0, break: 0 },
+      breakCategories: [],
+      users: [],
+      department: null,
+    });
+  }
+
+  const users = await User.find({ isActive: true, departmentId: dept._id })
+    .select('-__v')
+    .lean();
+  const enrichedUsers = users.map((u) => ({
+    ...u,
+    departmentName: dept.name,
+  }));
+  const userIds = users.map((u) => u._id);
+  const result = await buildOverview(userIds, enrichedUsers);
+  return res.json({ ...result, department: { _id: dept._id, name: dept.name } });
+});
+
+/**
+ * GET /api/users/:id — Admin/Manager: get single user detail
+ */
+router.get('/:id', authenticate, requireAdminOrManager, async (req, res) => {
+  const user = await User.findById(req.params.id)
+    .select('-__v')
+    .populate('departmentId', 'name');
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const obj = user.toObject();
   const now = Date.now();
   const stale = !user.lastDesktopHeartbeat || now - user.lastDesktopHeartbeat.getTime() > 5 * 60 * 1000;
   obj.desktopClientActive = !stale;
+  obj.departmentName = user.departmentId?.name || user.department || '';
 
   return res.json(obj);
 });
 
 /**
- * PATCH /api/users/:id — Admin: update user name and/or password
+ * PATCH /api/users/:id — Admin: update user name, password, and/or department
  */
 router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { name, password } = req.body;
+    const { name, password, departmentId } = req.body;
     const user = await User.findById(req.params.id).select('+password');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (name && name.trim()) user.name = name.trim();
     if (password) {
       if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-      user.password = password; // pre-save hook hashes it
+      user.password = password;
+    }
+    if (departmentId !== undefined) {
+      user.departmentId = departmentId || null;
     }
     await user.save();
     return res.json({ success: true, id: user._id, name: user.name });
@@ -207,7 +258,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
  */
 router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
   const { role } = req.body;
-  if (!['employee', 'admin'].includes(role)) {
+  if (!['employee', 'admin', 'manager'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
   const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true });

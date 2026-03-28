@@ -34,6 +34,7 @@ app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/screenshots', require('./routes/screenshots'));
 app.use('/api/productivity', require('./routes/productivity'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/departments', require('./routes/departments'));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }));
 

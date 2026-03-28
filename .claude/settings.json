@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(find '/c/Users/Rohit Krishna/Desktop/desktime' -maxdepth 3 -name docker-compose* -o -name Dockerfile*)",
-      "Bash(find . -type d ! -path */node_modules/* ! -path */.next/* ! -path */.git/*)"
+      "Bash(find . -type d ! -path */node_modules/* ! -path */.next/* ! -path */.git/*)",
+      "Bash(cd c:/Users/Rohit Krishna/Desktop/desktime)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Rohit Krishna\\Desktop\\desktime\\frontend\\app\\manager\\users"
     ]
   }
 }

@@ -33,8 +33,17 @@ export default function Navbar({ status }) {
         <div className="flex items-center gap-3">
           {status && <StatusBadge status={status} size="sm" />}
           <div className="hidden text-right sm:block">
-            <p className="text-sm font-medium text-slate-800">{user?.name}</p>
-            <p className="text-xs text-slate-400">{user?.role === 'admin' ? 'Administrator' : user?.jobTitle || 'Employee'}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-slate-800">{user?.name}</p>
+              {user?.departmentName && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                  {user.departmentName}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">
+              {user?.role === 'admin' ? 'Administrator' : user?.role === 'manager' ? 'Manager' : user?.jobTitle || 'Employee'}
+            </p>
           </div>
           {user?.avatarUrl ? (
             <img src={user.avatarUrl} alt={user.name} className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-200" />

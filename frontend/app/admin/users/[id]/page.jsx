@@ -93,7 +93,7 @@ export default function UserDetailPage() {
   useEffect(() => {
     if (!isAuthenticated()) { router.replace('/login'); return; }
     const me = getStoredUser();
-    if (me?.role !== 'admin') { router.replace('/dashboard'); return; }
+    if (!['admin', 'manager'].includes(me?.role)) { router.replace('/dashboard'); return; }
     fetchUser();
   }, [id]);
 

@@ -138,6 +138,7 @@ export default function DashboardPage() {
     if (!isAuthenticated()) { router.replace('/login'); return; }
     const user = getStoredUser();
     if (user?.role === 'admin') { router.replace('/admin'); return; }
+    if (user?.role === 'manager') { router.replace('/manager'); return; }
   }, [router]);
 
   // Attendance polling every 5 s
