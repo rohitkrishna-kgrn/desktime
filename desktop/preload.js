@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktime', {
   // Auth
   login: (email, password) => ipcRenderer.invoke('auth:login', { email, password }),
-  register: (email, password, name) => ipcRenderer.invoke('auth:register', { email, password, name }),
+  register: (email, password, name, departmentId) => ipcRenderer.invoke('auth:register', { email, password, name, departmentId }),
+  getDepartments: () => ipcRenderer.invoke('auth:getDepartments'),
   logout: () => ipcRenderer.invoke('auth:logout'),
   getUser: () => ipcRenderer.invoke('auth:getUser'),
 

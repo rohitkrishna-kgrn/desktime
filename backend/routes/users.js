@@ -5,6 +5,9 @@ const AppRule = require('../models/AppRule');
 const ProductivityLog = require('../models/ProductivityLog');
 const BreakLog = require('../models/BreakLog');
 const Department = require('../models/Department');
+const AttendanceLog = require('../models/AttendanceLog');
+const Screenshot = require('../models/Screenshot');
+const { getBucket } = require('../utils/gridfs');
 const { authenticate, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 const { invalidateCache } = require('../utils/categorize');
 
@@ -236,7 +239,7 @@ router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
- * DELETE /api/users/:id — Admin: soft-delete (deactivate) a user
+ * DELETE /api/users/:id — Admin: permanently delete a user and all their data
  */
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
@@ -245,8 +248,32 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     if (String(user._id) === String(req.user._id)) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
-    user.isActive = false;
-    await user.save();
+
+    const userId = user._id;
+
+    // Delete all screenshots from GridFS + metadata
+    const screenshots = await Screenshot.find({ userId }).select('_id fileId').lean();
+    const bucket = getBucket();
+    await Promise.all(
+      screenshots.map(async (s) => {
+        try { await bucket.delete(s.fileId); } catch { /* already gone */ }
+      })
+    );
+    await Screenshot.deleteMany({ userId });
+
+    // Delete all other user data
+    await Promise.all([
+      ProductivityLog.deleteMany({ userId }),
+      AttendanceLog.deleteMany({ userId }),
+      BreakLog.deleteMany({ userId }),
+    ]);
+
+    // Remove user as department manager
+    await Department.updateMany({ managerId: userId }, { $set: { managerId: null } });
+
+    // Delete the user document
+    await User.deleteOne({ _id: userId });
+
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });

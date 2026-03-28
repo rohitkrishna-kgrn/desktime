@@ -18,10 +18,16 @@ async function login(email, password) {
   return res.data; // { token, user }
 }
 
-async function register(email, password, name) {
+async function register(email, password, name, departmentId) {
   const client = getClient();
-  const res = await client.post('/auth/register', { email, password, name });
+  const res = await client.post('/auth/register', { email, password, name, departmentId: departmentId || undefined });
   return res.data; // { token, user }
+}
+
+async function getDepartments() {
+  const client = getClient();
+  const res = await client.get('/departments');
+  return res.data; // [{ _id, name, ... }]
 }
 
 async function sendHeartbeat() {
@@ -77,6 +83,7 @@ async function endBreak() {
 module.exports = {
   login,
   register,
+  getDepartments,
   sendHeartbeat,
   deactivateClient,
   uploadScreenshot,

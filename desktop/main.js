@@ -295,10 +295,19 @@ ipcMain.handle('auth:login', async (_e, { email, password }) => {
   }
 });
 
-ipcMain.handle('auth:register', async (_e, { email, password, name }) => {
+ipcMain.handle('auth:getDepartments', async () => {
+  try {
+    const data = await apiUtil.getDepartments();
+    return { success: true, departments: data };
+  } catch (err) {
+    return { success: false, departments: [] };
+  }
+});
+
+ipcMain.handle('auth:register', async (_e, { email, password, name, departmentId }) => {
   console.log('[IPC] auth:register called for:', email);
   try {
-    const data = await apiUtil.register(email, password, name);
+    const data = await apiUtil.register(email, password, name, departmentId);
     storage.saveAuth(data.token, data.user);
     isOnline = true;
     startTracking();

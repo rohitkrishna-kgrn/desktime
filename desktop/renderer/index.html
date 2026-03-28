@@ -479,6 +479,13 @@
         <label for="reg-email">Work Email</label>
         <input id="reg-email" type="email" autocomplete="email" placeholder="you@company.com" required />
 
+        <div id="dept-field" style="display:none;margin-bottom:14px">
+          <label for="reg-dept" style="margin-bottom:6px">Department</label>
+          <select id="reg-dept" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px;outline:none;color:var(--text);background:white;transition:border-color 0.15s">
+            <option value="">Select department…</option>
+          </select>
+        </div>
+
         <label for="reg-password">Password</label>
         <input id="reg-password" type="password" autocomplete="new-password" placeholder="Min. 6 characters" required />
 
@@ -553,7 +560,7 @@
       </div>
       <div class="info-row">
         <span class="key">Screenshot Interval</span>
-        <span class="val">Every 1 minute</span>
+        <span class="val">Every 10 minutes</span>
       </div>
     </div>
 
@@ -738,6 +745,20 @@
       document.getElementById('auth-subtitle').textContent =
         isLogin ? 'Sign in to your account' : 'Create your DeskTime account';
       hideError();
+      if (!isLogin) loadDepartments();
+    }
+
+    async function loadDepartments() {
+      try {
+        const result = await window.desktime.getDepartments();
+        const depts = result?.departments || [];
+        const select = document.getElementById('reg-dept');
+        const field  = document.getElementById('dept-field');
+        if (depts.length === 0) { field.style.display = 'none'; return; }
+        select.innerHTML = '<option value="">Select department…</option>' +
+          depts.map((d) => `<option value="${d._id}">${d.name}</option>`).join('');
+        field.style.display = 'block';
+      } catch { /* departments optional */ }
     }
 
     function onAuthSuccess(result) {
@@ -777,10 +798,11 @@
     // ── Register ──────────────────────────────────────────────
     async function doRegister() {
       hideError();
-      const name     = document.getElementById('reg-name').value.trim();
-      const email    = document.getElementById('reg-email').value.trim();
-      const password = document.getElementById('reg-password').value;
-      const confirm  = document.getElementById('reg-confirm').value;
+      const name         = document.getElementById('reg-name').value.trim();
+      const email        = document.getElementById('reg-email').value.trim();
+      const password     = document.getElementById('reg-password').value;
+      const confirm      = document.getElementById('reg-confirm').value;
+      const departmentId = document.getElementById('reg-dept').value || undefined;
 
       if (!name || !email || !password) {
         showError('All fields are required.');
@@ -799,7 +821,7 @@
       registerBtn.textContent = 'Creating account…';
 
       try {
-        const result = await window.desktime.register(email, password, name);
+        const result = await window.desktime.register(email, password, name, departmentId);
         if (result && result.success) {
           onAuthSuccess(result);
         } else {

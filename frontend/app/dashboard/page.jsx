@@ -10,7 +10,6 @@ import {
   getAppBreakdown,
   getScreenshots,
   getBreaks,
-  manualAttendance,
   startBreak,
   endBreak,
 } from '../../lib/api';
@@ -164,19 +163,6 @@ export default function DashboardPage() {
     } catch {}
   }
 
-  async function handleManualAttendance(action) {
-    setAttendanceError('');
-    setAttendanceLoading(true);
-    try {
-      await manualAttendance(action);
-      await fetchAttendance();
-    } catch (err) {
-      setAttendanceError(err?.response?.data?.error || err.message || 'Action failed.');
-    } finally {
-      setAttendanceLoading(false);
-    }
-  }
-
   async function handleStartBreak(reason, category) {
     setAttendanceError('');
     try {
@@ -305,62 +291,31 @@ export default function DashboardPage() {
               </span>
             )}
 
-            {attendance !== null && attendance?.desktopClientActive ? (
-              <>
-                {/* On Break → show Resume button */}
-                {attendance?.onBreak ? (
-                  <button
-                    onClick={handleEndBreak}
-                    disabled={attendanceLoading}
-                    className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {attendanceLoading ? 'Wait…' : 'Resume'}
-                  </button>
-                ) : attendance?.status === 'checked_in' ? (
-                  <>
-                    {/* Checked in → show Take Break + Check Out */}
-                    <button
-                      onClick={() => setShowBreakModal(true)}
-                      className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Take Break
-                    </button>
-                    <button
-                      onClick={() => handleManualAttendance('check_out')}
-                      disabled={attendanceLoading}
-                      className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-600 disabled:opacity-50"
-                    >
-                      <span className="inline-block h-2 w-2 rounded-full bg-white/80" />
-                      {attendanceLoading ? 'Wait…' : 'Check Out'}
-                    </button>
-                  </>
-                ) : (
-                  /* Checked out → Check In */
-                  <button
-                    onClick={() => handleManualAttendance('check_in')}
-                    disabled={attendanceLoading}
-                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />
-                    {attendanceLoading ? 'Wait…' : 'Check In'}
-                  </button>
-                )}
-              </>
-            ) : attendance !== null ? (
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400 cursor-not-allowed select-none">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Client Offline
-              </div>
-            ) : null}
+            {attendance !== null && attendance?.desktopClientActive && attendance?.status === 'checked_in' && (
+              attendance?.onBreak ? (
+                <button
+                  onClick={handleEndBreak}
+                  disabled={attendanceLoading}
+                  className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {attendanceLoading ? 'Wait…' : 'Resume'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowBreakModal(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Take Break
+                </button>
+              )
+            )}
           </div>
         </div>
 
