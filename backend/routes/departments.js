@@ -6,9 +6,9 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 /**
- * GET /api/departments — List all active departments (any authenticated user)
+ * GET /api/departments — List all active departments (public — needed for registration)
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', async (req, res) => {
   const departments = await Department.find({ isActive: true })
     .populate('managerId', 'name email')
     .sort({ name: 1 });
