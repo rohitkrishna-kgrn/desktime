@@ -216,9 +216,11 @@ export default function LoginPage() {
           Download for Windows Client
         </a>
 
-        <p className="mt-5 text-center text-xs text-slate-400">
-          Developed by KGRN
-        </p>
+        <div className="mt-5 flex items-center justify-center gap-3 text-xs text-slate-400">
+          <span>Developed by KGRN</span>
+          <span>·</span>
+          <a href="/docs" className="text-blue-500 hover:underline">User Manual</a>
+        </div>
       </div>
     </div>
   );
