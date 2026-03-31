@@ -207,7 +207,7 @@ export default function LoginPage() {
 
         {/* Download for Windows */}
         <a
-          href="https://github.com/rohitkrishna-kgrn/desktime/raw/main/desktop/app/DeskTime%20Setup%201.0.0.exe"
+          href="https://kgrnauditdxb-my.sharepoint.com/:u:/g/personal/servicedesk_kgrnaudit_com/IQAtLYtTsyv9TbNEEwIB09YpAWX1TkUAqnoBescllYG0Cjw?e=ticFgY&download=1"
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
         >
           <svg className="h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
