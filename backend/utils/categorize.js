@@ -1,15 +1,62 @@
 const AppRule = require('../models/AppRule');
 
 // Default productive app patterns
+// Includes both friendly names and actual Windows process names (e.g. powerpnt, winword, devenv)
 const DEFAULT_PRODUCTIVE = [
-  'excel', 'word', 'powerpoint', 'outlook', 'visual studio', 'vscode', 'code',
-  'intellij', 'pycharm', 'webstorm', 'sublime', 'atom', 'notepad++', 'vim', 'nvim',
-  'chrome', 'firefox', 'edge', 'brave', // browsers — mark neutral by default; can override
-  'terminal', 'cmd', 'powershell', 'bash', 'git',
-  'slack', 'teams', 'zoom', 'meet',
-  'figma', 'sketch', 'xd', 'photoshop', 'illustrator',
-  'postman', 'insomnia', 'dbeaver', 'datagrip', 'sequel pro',
+  // Microsoft Office — process names on Windows
+  'excel', 'winword', 'word', 'powerpnt', 'powerpoint', 'outlook', 'onenote', 'msaccess', 'mspub',
+  // IDEs / editors
+  'visual studio', 'vscode', 'code', 'devenv',
+  'intellij', 'pycharm', 'webstorm', 'rider', 'clion', 'goland',
+  'sublime', 'atom', 'notepad++', 'notepadplusplus', 'vim', 'nvim', 'gvim',
+  // Browsers
+  'chrome', 'firefox', 'msedge', 'edge', 'brave', 'opera',
+  // Terminals / shells
+  'terminal', 'windowsterminal', 'cmd', 'powershell', 'pwsh', 'bash', 'mintty', 'hyper', 'git',
+  // Communication & meetings
+  'slack', 'teams', 'msteams', 'zoom', 'meet', 'skype', 'webex',
+  // Design tools
+  'figma', 'sketch', 'xd', 'photoshop', 'illustrator', 'indesign', 'adobexd',
+  // Dev / DB tools
+  'postman', 'insomnia', 'dbeaver', 'datagrip', 'ssms', 'sequel pro', 'tableplus',
   'android studio', 'xcode',
+  // PDF tools (process names: AcroRd32, Acrobat, FoxitReader, PDFXEdit)
+  'acrobat', 'acrord32', 'foxitreader', 'foxitpdfeditor', 'pdfxedit', 'pdfxchangeeditor',
+  // ── Chartered Accountant / Finance firm apps ──────────────────────────────
+  // Tally ERP / Tally Prime
+  'tally', 'tallyerp', 'tallyprime',
+  // Busy Accounting Software
+  'busy', 'busywin',
+  // Marg ERP
+  'marg', 'margcomp',
+  // Wings ERP / Accounting
+  'wings',
+  // Spectrum (accounting)
+  'spectrum',
+  // SAP GUI
+  'sapgui', 'saplogon',
+  // QuickBooks
+  'qbw', 'qbw32', 'quickbooks',
+  // Zoho Books / Zoho apps
+  'zoho',
+  // Computax (CA tax software)
+  'computax',
+  // TaxBase
+  'taxbase',
+  // TDS software (ExpressTDS, TDS-PRO, ClearTDS)
+  'tdspro', 'expresstds', 'cleartds', 'winman',
+  // Genius (tax / accounting)
+  'genius',
+  // CA Office
+  'caoffice',
+  // File archiving (CA work involves zipping/unzipping files)
+  'winzip', 'winrar', '7zfm', 'peazip',
+  // OneDrive / SharePoint (document management)
+  'onedrive', 'sharepoint',
+  // Remote desktop (WFH)
+  'mstsc', 'anydesk', 'teamviewer',
+  // MS Whiteboard / Visio
+  'visio', 'whiteboard',
 ];
 
 const DEFAULT_UNPRODUCTIVE = [

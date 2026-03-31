@@ -19,6 +19,7 @@ const PRODUCTIVE_NAMES = new Set([
   'outlook',
   'onenote',
   'msaccess',
+  'mspub',         // Publisher
   'chrome',        // Browsers
   'msedge',
   'firefox',
@@ -34,10 +35,11 @@ const PRODUCTIVE_NAMES = new Set([
   'mintty',
   'hyper',
   'teams',         // Communication
+  'msteams',
   'slack',
   'zoom',
-  'msteams',
   'skype',
+  'webex',
   'postman',       // Dev tools
   'insomnia',
   'dbeaver',
@@ -47,12 +49,46 @@ const PRODUCTIVE_NAMES = new Set([
   'xd',
   'sketch',
   'onedrive',      // Cloud / productivity
-  'onenote',
   'github desktop',
   'sourcetree',
   'fork',
   'gitkraken',
   'node', 'nodemon',
+  // ── Chartered Accountant / Finance firm apps ──────────────────────────────
+  'tally',         // Tally.ERP 9 / Tally Prime
+  'tallyerp',
+  'tallyprime',
+  'busy',          // Busy Accounting Software
+  'busywin',
+  'marg',          // Marg ERP
+  'margcomp',
+  'wings',         // Wings ERP
+  'spectrum',      // Spectrum Accounting
+  'sapgui',        // SAP GUI
+  'saplogon',
+  'qbw',           // QuickBooks
+  'qbw32',
+  'computax',      // Computax CA software
+  'taxbase',       // TaxBase
+  'tdspro',        // TDS-PRO
+  'expresstds',    // ExpressTDS
+  'cleartds',
+  'winman',        // WinMan CA
+  'genius',        // Genius Tax/Accounting
+  'caoffice',      // CA Office
+  'acrobat',       // Adobe Acrobat
+  'acrord32',      // Adobe Reader
+  'foxitreader',   // Foxit PDF Reader
+  'foxitpdfeditor',
+  'pdfxedit',      // PDF-XChange
+  'pdfxchangeeditor',
+  'winzip',        // File archiving
+  'winrar',
+  '7zfm',
+  'mstsc',         // Remote Desktop (WFH)
+  'anydesk',
+  'teamviewer',
+  'visio',         // MS Visio
 ]);
 
 function isProductive(processName) {
@@ -68,12 +104,14 @@ function isProductive(processName) {
 
 class AppTracker {
   constructor() {
-    this._samples        = new Map(); // processName → { appName, windowTitle, durationSeconds, productive }
-    this._lastSampleTime = Date.now();
-    this._pollInterval   = null;
+    this._samples          = new Map(); // processName → { appName, windowTitle, durationSeconds, productive }
+    this._lastSampleTime   = Date.now();
+    this._pollInterval     = null;
+    this._sampleIntervalMs = 5_000;
   }
 
   start(sampleIntervalMs = 5_000) {
+    this._sampleIntervalMs = sampleIntervalMs;
     this._lastSampleTime = Date.now();
     this._sample(); // immediate first sample
     this._pollInterval = setInterval(() => this._sample(), sampleIntervalMs);
@@ -88,7 +126,10 @@ class AppTracker {
 
   async _sample() {
     const now     = Date.now();
-    const elapsed = (now - this._lastSampleTime) / 1000; // seconds
+    // Cap elapsed to 2× sample interval to prevent sleep/wake inflation
+    // (if PC was suspended, the timer fires immediately on wake with a huge gap)
+    const rawElapsed = (now - this._lastSampleTime) / 1000;
+    const elapsed = Math.min(rawElapsed, (this._sampleIntervalMs / 1000) * 2);
     this._lastSampleTime = now;
 
     try {

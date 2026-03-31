@@ -161,23 +161,75 @@ export default function ManagerUserDetailPage() {
         </button>
 
         {/* User header */}
-        <div className="mb-6 flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
-            {user.name?.[0]?.toUpperCase() || '?'}
+        <div className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+              {user.name?.[0]?.toUpperCase() || '?'}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg font-bold text-slate-900">{user.name}</h1>
+                {user.departmentName && (
+                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
+                    {user.departmentName}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-500">{user.email}</p>
+              {user.jobTitle && <p className="text-xs text-slate-400">{user.jobTitle}</p>}
+            </div>
+            <StatusBadge status={user.currentStatus} />
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold text-slate-900">{user.name}</h1>
-              {user.departmentName && (
-                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">
-                  {user.departmentName}
-                </span>
+          {/* Check-in / Check-out times */}
+          {(user.lastCheckIn || user.lastCheckOut) && (
+            <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4">
+              {user.lastCheckIn && (
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
+                    <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Check In</p>
+                    <p className="text-sm font-semibold text-emerald-700">
+                      {format(new Date(user.lastCheckIn), 'MMM d, h:mm a')}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {user.lastCheckOut && (
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100">
+                    <svg className="h-3.5 w-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Check Out</p>
+                    <p className="text-sm font-semibold text-red-600">
+                      {format(new Date(user.lastCheckOut), 'MMM d, h:mm a')}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {user.lastCheckIn && user.lastCheckOut && new Date(user.lastCheckOut) > new Date(user.lastCheckIn) && (
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                    <svg className="h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Duration</p>
+                    <p className="text-sm font-semibold text-blue-700">
+                      {fmtHours(Math.round((new Date(user.lastCheckOut) - new Date(user.lastCheckIn)) / 1000))}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
-            <p className="text-sm text-slate-500">{user.email}</p>
-            {user.jobTitle && <p className="text-xs text-slate-400">{user.jobTitle}</p>}
-          </div>
-          <StatusBadge status={user.currentStatus} />
+          )}
         </div>
 
         {/* Period selector */}

@@ -35,17 +35,21 @@ async function syncProductivityLogs(freshLogs) {
   const all = [...queued, ...freshLogs];
   if (!all.length) return;
 
-  try {
-    // Send in batches of 200
-    for (let i = 0; i < all.length; i += 200) {
-      await api.sendProductivityLogs(all.slice(i, i + 200));
+  // Send in batches of 200; track which batches fail so we don't re-queue already-sent data
+  const failed = [];
+  for (let i = 0; i < all.length; i += 200) {
+    const batch = all.slice(i, i + 200);
+    try {
+      await api.sendProductivityLogs(batch);
+      online = true;
+    } catch {
+      online = false;
+      failed.push(...batch);
     }
-    online = true;
-  } catch {
-    online = false;
-    // Re-queue everything
-    for (const log of all) storage.queueProductivityLog(log);
-    console.warn('[Sync] Productivity logs queued for retry');
+  }
+  if (failed.length) {
+    for (const log of failed) storage.queueProductivityLog(log);
+    console.warn(`[Sync] ${failed.length} productivity logs queued for retry`);
   }
 }
 

@@ -148,6 +148,7 @@ router.get('/image/:fileId', authenticate, async (req, res) => {
 
     if (
       req.user.role !== 'admin' &&
+      req.user.role !== 'manager' &&
       meta.userId.toString() !== req.user._id.toString()
     ) {
       return res.status(403).json({ error: 'Forbidden' });

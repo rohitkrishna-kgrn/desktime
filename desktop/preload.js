@@ -25,4 +25,9 @@ contextBridge.exposeInMainWorld('desktime', {
     ipcRenderer.on('status:update', (_event, data) => cb(data));
     return () => ipcRenderer.removeAllListeners('status:update');
   },
+
+  // Auto-update events
+  onUpdateDownloading: (cb) => ipcRenderer.on('update:downloading', (_e, data) => cb(data)),
+  onUpdateProgress:    (cb) => ipcRenderer.on('update:progress',    (_e, data) => cb(data)),
+  onUpdateReady:       (cb) => ipcRenderer.on('update:ready',       (_e, data) => cb(data)),
 });

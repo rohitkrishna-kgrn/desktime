@@ -14,6 +14,7 @@ const { AppTracker } = require('./utils/appTracker');
 const { captureScreen } = require('./utils/screenshot');
 const apiUtil = require('./utils/api');
 const { getLogoPath } = require('./utils/logoPath');
+const autoUpdater = require('./utils/autoUpdater');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const HEARTBEAT_INTERVAL_MS    = 60 * 1000;      // 1 min
@@ -115,6 +116,7 @@ function updateTrayMenu() {
     { label: statusLabel, enabled: false },
     { type: 'separator' },
     { label: 'Open DeskTime', click: () => mainWindow?.show() },
+    { label: 'Check for Updates', click: () => autoUpdater.checkNow(mainWindow) },
     { type: 'separator' },
     {
       label: 'Quit',
@@ -385,6 +387,9 @@ app.whenReady().then(() => {
     isOnline = false;
     startTracking();
   }
+
+  // Start auto-updater after window is ready
+  autoUpdater.start(mainWindow);
 });
 
 app.on('window-all-closed', (e) => {
@@ -402,6 +407,7 @@ app.on('before-quit', async (e) => {
 
   e.preventDefault();
   stopTracking();
+  autoUpdater.stop();
 
   try { await sync.syncDeactivate(); } catch { /* offline — ok */ }
 

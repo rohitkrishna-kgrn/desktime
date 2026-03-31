@@ -518,6 +518,17 @@
       <button class="btn-sm" id="logout-btn">Logout</button>
     </div>
 
+    <!-- Update banner (hidden until update is downloading) -->
+    <div id="update-banner" style="display:none;align-items:center;gap:8px;background:#1a56db;color:#fff;padding:8px 14px;font-size:12px;font-weight:500;">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+      </svg>
+      <span id="update-banner-text">Downloading update…</span>
+      <div style="flex:1;background:rgba(255,255,255,0.25);border-radius:4px;height:4px;overflow:hidden;min-width:60px;">
+        <div id="update-progress-bar" style="height:100%;background:#fff;border-radius:4px;width:0%;transition:width 0.3s;"></div>
+      </div>
+    </div>
+
     <!-- Status card -->
     <div class="status-card">
       <div class="user-info">
@@ -916,6 +927,27 @@
       updateTrackingRow(data.status, onBreak);
       updateBreakSection(data.status, onBreak);
       updateLastUpdated();
+    });
+
+    // ── Auto-update events ────────────────────────────────────
+    const updateBanner = document.getElementById('update-banner');
+    const updateBannerText = document.getElementById('update-banner-text');
+    const updateProgress = document.getElementById('update-progress-bar');
+
+    window.desktime.onUpdateDownloading(({ version }) => {
+      updateBanner.style.display = 'flex';
+      updateBannerText.textContent = `Downloading v${version}…`;
+      updateProgress.style.width = '0%';
+    });
+
+    window.desktime.onUpdateProgress(({ percent }) => {
+      updateBannerText.textContent = `Downloading update… ${percent}%`;
+      updateProgress.style.width = `${percent}%`;
+    });
+
+    window.desktime.onUpdateReady(({ version }) => {
+      updateBannerText.textContent = `v${version} ready — installing…`;
+      updateProgress.style.width = '100%';
     });
 
     // ── Clock ─────────────────────────────────────────────────
