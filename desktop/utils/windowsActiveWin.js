@@ -1,21 +1,20 @@
 /**
  * windowsActiveWin.js
  *
- * Zero-native-dependency active window detection for Windows.
- * Spawns a single persistent PowerShell process that compiles the Win32
- * P/Invoke code ONCE on startup, then answers "get" commands fast.
+ * Gets the currently active window (process name + title) on Windows.
  *
- * Roundtrip per query after warm-up: ~10–20 ms.
+ * Uses a persistent PowerShell process with:
+ *   -ExecutionPolicy Bypass  — works on restricted/corporate machines
+ *   -EncodedCommand          — passes script as base64 (no temp file, no AV flags)
+ *
+ * Falls back to returning null (recorded as idle) if PowerShell is
+ * unavailable or blocked, rather than crashing the app.
  */
 
 const { spawn } = require('child_process');
-const os   = require('os');
-const path = require('path');
-const fs   = require('fs');
 
-// PowerShell script written to %TEMP% once
-const SCRIPT_PATH = path.join(os.tmpdir(), 'desktime_active_win.ps1');
-
+// ── PowerShell script ────────────────────────────────────────────────────────
+// Reads "get" commands from stdin, responds with "processName|windowTitle\n"
 const PS_SCRIPT = `
 $ErrorActionPreference = 'SilentlyContinue'
 Add-Type -TypeDefinition @"
@@ -52,58 +51,42 @@ while ($true) {
 }
 `.trimStart();
 
-let psProcess  = null;
-let psReady    = false;
+// Encode script as UTF-16LE base64 for PowerShell -EncodedCommand.
+// This avoids writing any temp file (no AV flags) and bypasses execution policy.
+function buildEncodedArg(script) {
+  const buf = Buffer.alloc(script.length * 2);
+  for (let i = 0; i < script.length; i++) {
+    buf.writeUInt16LE(script.charCodeAt(i), i * 2);
+  }
+  return buf.toString('base64');
+}
+
+const ENCODED_SCRIPT = buildEncodedArg(PS_SCRIPT);
+
+// ── State ────────────────────────────────────────────────────────────────────
+let psProcess     = null;
+let psReady       = false;
 let pendingResolve = null;
-let outputBuf  = '';
-let startupTimer = null;
+let outputBuf     = '';
+let startupTimer  = null;
+let startAttempts = 0;
+const MAX_ATTEMPTS = 3;
 
-function ensureScript() {
-  try { fs.writeFileSync(SCRIPT_PATH, PS_SCRIPT, 'utf8'); } catch { /* ignore */ }
+// ── Safe stdin write — never throws ─────────────────────────────────────────
+function safeWrite(data) {
+  if (!psProcess || psProcess.killed || !psProcess.stdin.writable) return false;
+  try {
+    psProcess.stdin.write(data);
+    return true;
+  } catch {
+    // EPIPE or other write error — process is gone
+    psReady = false;
+    psProcess = null;
+    return false;
+  }
 }
 
-function startPS() {
-  ensureScript();
-
-  psProcess = spawn(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-File', SCRIPT_PATH],
-    { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }
-  );
-
-  psProcess.stdout.setEncoding('utf8');
-
-  // Warm-up: Add-Type compilation takes ~800ms on first run
-  // Send a probe "get" after 1200ms; if we get a response, mark ready
-  startupTimer = setTimeout(() => {
-    if (psProcess && !psProcess.killed) {
-      psProcess.stdin.write('get\n');
-    }
-  }, 1200);
-
-  psProcess.stdout.on('data', (chunk) => {
-    outputBuf += chunk;
-    const lines = outputBuf.split('\n');
-    outputBuf = lines.pop(); // keep incomplete last line
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      psReady = true; // at least one response received
-
-      if (pendingResolve) {
-        const resolve = pendingResolve;
-        pendingResolve = null;
-        resolve(parseResult(trimmed));
-      }
-    }
-  });
-
-  psProcess.on('error', () => { psReady = false; psProcess = null; });
-  psProcess.on('exit',  () => { psReady = false; psProcess = null; });
-}
-
+// ── Parse a "processName|title" line ────────────────────────────────────────
 function parseResult(line) {
   const idx = line.indexOf('|');
   if (idx === -1) return { processName: 'idle', title: '' };
@@ -113,24 +96,110 @@ function parseResult(line) {
   };
 }
 
+// ── Start / restart the PowerShell child process ─────────────────────────────
+function startPS() {
+  if (startAttempts >= MAX_ATTEMPTS) {
+    console.warn('[ActiveWin] PowerShell failed after max attempts — app tracking disabled');
+    return;
+  }
+  startAttempts++;
+
+  try {
+    psProcess = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass',  // works on restricted/corporate machines
+        '-EncodedCommand', ENCODED_SCRIPT, // no temp file — bypasses AV
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }
+    );
+  } catch (err) {
+    console.warn('[ActiveWin] Failed to spawn PowerShell:', err.message);
+    psProcess = null;
+    return;
+  }
+
+  // Prevent unhandled EPIPE on stdin
+  psProcess.stdin.on('error', () => {
+    psReady = false;
+  });
+
+  psProcess.stdout.setEncoding('utf8');
+  psProcess.stdout.on('error', () => {});
+
+  // Warm-up: Add-Type compilation takes ~800-1200ms on first run.
+  // Send a probe after 2s; first response marks psReady = true.
+  startupTimer = setTimeout(() => {
+    safeWrite('get\n');
+  }, 2000);
+
+  psProcess.stdout.on('data', (chunk) => {
+    outputBuf += chunk;
+    const lines = outputBuf.split('\n');
+    outputBuf = lines.pop();
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      psReady = true;
+
+      if (pendingResolve) {
+        const resolve = pendingResolve;
+        pendingResolve = null;
+        resolve(parseResult(trimmed));
+      }
+    }
+  });
+
+  psProcess.on('error', (err) => {
+    console.warn('[ActiveWin] PS process error:', err.message);
+    psReady = false;
+    psProcess = null;
+  });
+
+  psProcess.on('exit', (code) => {
+    console.warn(`[ActiveWin] PS process exited (code ${code})`);
+    psReady = false;
+    psProcess = null;
+
+    // Resolve any pending request as idle so callers aren't stuck
+    if (pendingResolve) {
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve({ processName: 'idle', title: '' });
+    }
+  });
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
 /**
  * Get the currently focused window.
- * Returns { processName, title } or null on timeout.
+ * Returns { processName, title } or null on timeout / PS unavailable.
  */
 function getActiveWindow() {
   return new Promise((resolve) => {
-    // Start PS if not running
-    if (!psProcess || psProcess.killed) {
-      startPS();
-    }
-
-    if (!psReady) {
-      // Still warming up — return null
+    // If max attempts reached, return null (all samples → idle)
+    if (startAttempts >= MAX_ATTEMPTS && !psProcess) {
       resolve(null);
       return;
     }
 
-    // Set 2-second timeout in case PS hangs
+    // Restart PS if it died
+    if (!psProcess || psProcess.killed) {
+      startPS();
+    }
+
+    // Still warming up — return null (sample skipped, no elapsed added)
+    if (!psReady) {
+      resolve(null);
+      return;
+    }
+
+    // 2-second timeout guards against PS hangs
     const timer = setTimeout(() => {
       pendingResolve = null;
       resolve(null);
@@ -141,9 +210,7 @@ function getActiveWindow() {
       resolve(result);
     };
 
-    try {
-      psProcess.stdin.write('get\n');
-    } catch {
+    if (!safeWrite('get\n')) {
       clearTimeout(timer);
       pendingResolve = null;
       resolve(null);
@@ -152,10 +219,10 @@ function getActiveWindow() {
 }
 
 function shutdown() {
-  if (startupTimer) clearTimeout(startupTimer);
+  if (startupTimer) { clearTimeout(startupTimer); startupTimer = null; }
   if (psProcess && !psProcess.killed) {
-    try { psProcess.stdin.write('q\n'); } catch { /* ignore */ }
-    psProcess.kill();
+    safeWrite('q\n');
+    try { psProcess.kill(); } catch { /* already dead */ }
   }
   psProcess = null;
   psReady   = false;
